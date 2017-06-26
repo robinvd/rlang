@@ -1,0 +1,12 @@
+resolver: lts-8.20
+
+nix:
+  enable: true
+
+packages:
+- .
+extra-deps: []
+
+flags: {}
+
+extra-package-dbs: []

@@ -7,4 +7,4 @@ import Rlang.Parsing
 import qualified Data.Text.IO as T
 
 main :: IO ()
-main = T.getContents >>= print . parse
+main = T.getContents >>= print . parseTopLevel
