@@ -68,12 +68,10 @@ parseFunction = do
   return $ Func t n args b
   where
     parseBody :: Parsec Text () [Expression]
-    parseBody = do
-      char '{'
+    parseBody = between (char '{') (char '}') $ do
       spaces
       body <- endBy parseExpression (spaces >> char ';' >> spaces)
       spaces
-      char '}'
       return body
     parseArgs = do
       char '('
@@ -81,6 +79,7 @@ parseFunction = do
         n <- parseLit
         spaces
         char ':'
+        spaces
         t <- parseType
         return (n, t)
       char ')'
@@ -93,7 +92,7 @@ parseType = choice
   , string "Char" >> return Char]
 
 parseExpression :: Parsec Text () Expression
-parseExpression = choice [parseAssignment, Val <$> parseVal, parseFCall] -- , parseFCall, Val <$> parseVal]
+parseExpression = choice [try parseFCall, try parseAssignment, try $ Val <$> parseVal]
   where
     parseAssignment = do
       n <- parseLit
@@ -107,11 +106,14 @@ parseExpression = choice [parseAssignment, Val <$> parseVal, parseFCall] -- , pa
       spaces
       args <- parseArgs
       return $ FCall n args
-    parseArgs = do
-      char '('
-      x <- sepBy parseExpression (spaces >> char ',' >> spaces) 
-      char ')'
-      return x
+    parseArgs = between (char '(') (char ')') $
+      sepBy parseExpression (spaces >> char ',' >> spaces) 
 
 parse :: Text -> Either ParseError [Function]
-parse = runParser (many parseFunction) () "rlang"
+parse = runParser (many $ spaces >> f) () "rlang"
+  where 
+  f :: Parsec Text () Function
+  f = do
+    x <- parseFunction
+    spaces
+    return x
