@@ -1,18 +1,18 @@
 # This YAML file describes your package. Stack will automatically generate a
 # Cabal file when you run `stack build`. See the hpack website for help with
 # this file: <https://github.com/sol/hpack>.
-benchmarks:
-  rlang-benchmarks:
-    dependencies:
-    - base
-    - rlang
-    - criterion
-    ghc-options:
-    - -rtsopts
-    - -threaded
-    - -with-rtsopts=-N
-    main: Main.hs
-    source-dirs: benchmark
+# benchmarks:
+#   rlang-benchmarks:
+#     dependencies:
+#     - base
+#     - rlang
+#     - criterion
+#     ghc-options:
+#     - -rtsopts
+#     - -threaded
+#     - -with-rtsopts=-N
+#     main: Main.hs
+#     source-dirs: benchmark
 category: Other
 description: rlang is a new Haskeleton package.
 executables:
@@ -20,7 +20,7 @@ executables:
     dependencies:
     - base
     - rlang
-    - text
+    - text >= 1.2.2.0
     ghc-options:
     - -rtsopts
     - -threaded
@@ -34,19 +34,19 @@ extra-source-files:
 - README.md
 - stack.yaml
 ghc-options: -Wall
-github: githubuser/rlang
+github: robinvd/rlang
 library:
   dependencies:
   - base
   - parsec
     # - parsec-numbers
-  - containers
-  - mtl
-  - text
-  - bytestring
+  - containers >= 0.5.10.2
+  - mtl >= 2.2.1
+  - text >= 1.2.2.0
+  - bytestring >= 0.10.8.1
   source-dirs: library
 license: MIT
-maintainer: Author name here
+maintainer: Robin
 name: rlang
 synopsis: A new Haskeleton package.
 # tests:

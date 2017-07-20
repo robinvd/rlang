@@ -2,6 +2,8 @@
 
 module Rlang.Core where
 
+import Data.Text (Text)
+
 import Rlang.Syntax
 
 type Core = [CFunc]
