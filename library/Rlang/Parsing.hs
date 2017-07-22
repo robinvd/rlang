@@ -8,7 +8,6 @@ import           Text.Parsec ((<|>), many, Parsec, ParsecT, choice, parse, eof, 
 import           Text.Parsec.Text ()
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
-import           Text.Parsec.Char hiding (spaces)
 import           Data.Text (Text)
 import qualified Data.Text as T
 

@@ -6,22 +6,27 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import Data.Char (isAlpha)
 import Data.List (intersperse)
+import Data.Monoid ((<>))
+import Data.Foldable (foldMap)
 
+import Rlang.Core
 import Rlang.Syntax
 
 includes :: [Text]
 includes = 
   [ "#include <stdio.h>"
+  , "#define set(a, b) (a = b)"
   , "typedef char* String;"
   , "typedef char Char;"
   , "typedef int Int;"
   , "Int plus(Int a, Int b) {return(a + b);}"
   , "Int min(Int a, Int b) {return(a - b);}"
   , "Int eq(Int a, Int b) {return(a == b);}"
-  , "Int mod(Int a, Int b) {return(a % b);}"]
+  , "Int mod(Int a, Int b) {return(a % b);}"
+  , "Int not(Int a) {return(!a);}"]
   
 
-codegenTop :: [TopLevel] -> Text
+codegenTop :: Core -> Text
 codegenTop = T.unlines . (includes ++) . fmap codegen
 
 codegenType :: Type -> Text
@@ -36,19 +41,16 @@ codegenType x = case x of
 genArgs :: [(Text, Type)] -> Text
 genArgs args = T.concat . intersperse ", " . map (\(name, t) -> T.concat [codegenType t, " ", name] ) $ args
 
-codegen :: TopLevel -> Text
-codegen x = case x of
-
-  Function t name args body -> T.concat $ intersperse " "
+codegen :: CFunc -> Text
+codegen (CFunc t origName name args body)  =
+  T.concat $ intersperse " "
     [ codegenType t
     , name
     , "("
     , genArgs args
-    , ") { return("
-    , codegenExpr body
-    , "); }"]
-  Binary t name args body -> codegen $ Function t ("infix" `T.append` T.concatMap (T.pack . show . fromEnum) name) args body
-  _ -> "/* (TODO) */"
+    , ") {"
+    , T.concat . map codegenExpr $ body
+    , "}"]
 
 genPrim :: Prim -> Text
 genPrim x = case x of
@@ -59,39 +61,50 @@ genPrim x = case x of
   -- Tulple?
   -- Unit = 
 
-codegenExpr :: Expression -> Text
+codegenExpr :: CExpr -> Text
 codegenExpr x = case x of
 
-  FCall name args -> if T.all (isAlpha) name
+  CStatement x -> codegenStatement x <> ";"
 
-    then T.concat [name, "(", T.concat $ intersperse ", " $ map codegenExpr args, ")"]
+  CIf cond t f -> T.concat 
+    ["if("
+    , codegenStatement cond
+    , "){"
+    , T.concat . map codegenExpr $ t
+    , "} else { "
+    , T.concat . map codegenExpr $ f
+    , "}"]
+
+  CWhile pred body -> T.concat
+    [ "while ("
+    , codegenStatement pred
+    , "){ "
+    , T.concat . map codegenExpr $ body
+    , "}"]
+
+  CScope body ->
+    "do {" <>
+    foldMap codegenExpr body <>
+    "} while (0);"
+
+codegenStatement :: CStatement -> Text
+codegenStatement s = case s of
+  CCall name args -> if T.all (isAlpha) name
+    then T.concat 
+      [name
+      , "("
+      , T.concat $ intersperse " , " $ map codegenStatement args
+      , ")"]
     else T.concat 
       ["infix" `T.append` T.concatMap (T.pack . show . fromEnum) name
       , "("
-      , T.concat $ intersperse ", " $ map codegenExpr args
+      , T.concat $ intersperse ", " $ map codegenStatement args
       , ")"]  -- [codegenExpr left, " ", name, " ", codegenExpr right]
 
-  -- Lambda
+  CAssign var st-> T.concat [var, " = ", codegenStatement st]
 
-  Var name -> name
+  CLit pr -> genPrim pr
 
-  Lit pr -> genPrim pr
+  CVar name -> name
 
-  -- Assignment var expr -> T.concat [var, " = ", codegenExpr expr]
-
-  Let varName t value body -> T.concat $ intersperse " "
-    [ codegenType t
-    , varName
-    , "="
-    , codegenExpr value
-    , ";"
-    , codegenExpr body]
-
-  If cond t f -> T.concat ["(", codegenExpr cond, " ? ", codegenExpr t, " : ", codegenExpr f, ")"]
-
-  While pred body -> T.concat
-    [ "while ("
-    , codegenExpr pred
-    , "){ "
-    , codegenExpr body
-    , "}"]
+  CInit name t -> T.concat [codegenType t, " ", name]

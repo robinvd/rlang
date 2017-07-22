@@ -5,6 +5,7 @@ import Rlang.Parsing
 import Rlang.Scan
 import Rlang.Syntax
 import Rlang.Codegen
+import Rlang.Core
 
 import qualified Data.Text.IO as T
 import System.IO
@@ -33,4 +34,5 @@ main = do
       -- print $ fmap (runCheck (scanTop x)) (getBodys x)
       -- print $ fmap (checkTop (scanTop x)) (getFuncs x)
       -- print $ fmap (\a -> (== getRetType a) <$> checkTop (scanTop x) a) (getFuncs x)
-      T.putStrLn $ codegenTop x
+      hPrint stderr $ toCore x
+      T.putStrLn $ codegenTop $ toCore x
