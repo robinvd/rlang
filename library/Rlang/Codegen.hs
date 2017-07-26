@@ -19,7 +19,9 @@ import qualified LLVM.AST as AST
 import qualified LLVM.AST.Linkage as L
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Attribute as A
+import qualified LLVM.AST.Visibility as V
 import qualified LLVM.AST.CallingConvention as CC
+import qualified LLVM.AST.FunctionAttribute as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
 
 tShow :: Show a => a -> Text
@@ -43,7 +45,19 @@ addDefn d = do
   defs <- gets moduleDefinitions
   modify $ \s -> s { moduleDefinitions = defs ++ [d] }
 
-define ::  Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
+defineInline :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
+defineInline retty label argtys body = addDefn $
+  GlobalDefinition $ functionDefaults {
+    name        = Name label
+  , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
+  , returnType  = retty
+  , basicBlocks = body
+  , AST.functionAttributes = [Right F.AlwaysInline]
+  , visibility = V.Hidden
+  }
+
+
+define :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $
   GlobalDefinition $ functionDefaults {
     name        = Name label

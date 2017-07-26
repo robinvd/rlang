@@ -7,6 +7,7 @@ import LLVM.Module
 import LLVM.Context
 
 import qualified LLVM.AST as AST
+import LLVM.AST
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
@@ -26,13 +27,6 @@ import qualified Rlang.Syntax as S
 codegenTop :: S.CFunc -> LLVM ()
 codegenTop S.CFunc{..} =
   define int (T.unpack name) fnargs $ bls
-  -- createBlocks $ execCodegen $ do
-  --   entry <- addBlock entryBlockName
-  --   setBlock entry
-  --   var <- alloca int
-  --   store var (cons (C.Int 64 2))
-  --   -- assign (cons $ C.Int 64 2) var
-  --   ret $ cons $ C.Int 64 1
   where
     fnargs = toSig $ map fst args
     bls = createBlocks $ execCodegen $ do
@@ -43,7 +37,26 @@ codegenTop S.CFunc{..} =
         store var (local (AST.Name (T.unpack (fst a))))
         assign (fst a) var
       mapM cgen body -- >>= ret
-      -- ret $ cons $ C.Int 64 10
+
+prelude :: LLVM ()
+prelude = do
+  let args = ["a","b"]
+  defineInline int "+" (toSig args) $
+    createBlocks $ execCodegen $ do
+      entry <- addBlock entryBlockName
+      setBlock entry
+      res <- (instr $ Add False False
+        (LocalReference int (Name "a"))
+        (LocalReference int (Name "b")) [])
+      ret res
+  defineInline int "-" (toSig args) $
+    createBlocks $ execCodegen $ do
+      entry <- addBlock entryBlockName
+      setBlock entry
+      res <- (instr $ Sub False False
+        (LocalReference int (Name "a"))
+        (LocalReference int (Name "b")) [])
+      ret res
 
 toSig :: [Text] -> [(AST.Type, AST.Name)]
 toSig = map (\x -> (int, AST.Name (T.unpack x)))
@@ -69,7 +82,7 @@ stCgen (S.CInit name t) = do
   assign name var
   return var
 stCgen (S.Ret x) = do
-  s <- stCgen x 
+  s <- stCgen x
   ret s
   return s
 
@@ -90,5 +103,5 @@ codegen mod fns = withContext $ \context ->
     -- putStrLn llstr
     return newast
   where
-    modn = mapM codegenTop fns
+    modn = mapM codegenTop fns >> prelude
     newast = runLLVM mod modn

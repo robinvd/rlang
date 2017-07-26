@@ -9,7 +9,9 @@ import stdrl
 
 main() : Int = fib(3)
 
-fib(x : Int) : Int = 13 + 1
+fac(x : Int) : Int = x + fac(x - 1)
+
+fib(x : Int) : Int = 13 + 1 + 2 + 6 + x
 # fib(x : Int) : Int =
 #   if x == 0 then
 #     0

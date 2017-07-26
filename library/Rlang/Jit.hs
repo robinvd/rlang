@@ -26,13 +26,26 @@ run fn = haskFun (castFunPtr fn :: FunPtr (IO Int))
 jit :: Context -> (EE.MCJIT -> IO a) -> IO a
 jit c = EE.withMCJIT c optlevel model ptrelim fastins
   where
-    optlevel = Just 0  -- optimization level
+    optlevel = Just 3  -- optimization level
     model    = Nothing -- code model ( Default )
     ptrelim  = Nothing -- frame pointer elimination
     fastins  = Nothing -- fast instruction selection
 
 passes :: PassSetSpec
-passes = defaultCuratedPassSetSpec { optLevel = Just 3 }
+passes = defaultPassSetSpec
+  { transforms = 
+    [ FunctionAttributes
+    , AlwaysInline True
+    , FunctionInlining 10
+    , PromoteMemoryToRegister
+    , InstructionCombining
+    , ConstantPropagation
+    , DeadCodeElimination
+    , AggressiveDeadCodeElimination
+    , GlobalDeadCodeElimination
+    , TailCallElimination
+    ]
+  }
 
 runJIT :: AST.Module -> IO (Either String AST.Module)
 runJIT mod = do
@@ -41,7 +54,7 @@ runJIT mod = do
       runExceptT $ withModuleFromAST context mod $ \m ->
         withPassManager passes $ \pm -> do
           -- Optimization Pass
-          {-runPassManager pm m-}
+          runPassManager pm m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
           putStrLn s

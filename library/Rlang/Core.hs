@@ -36,7 +36,6 @@ data CStatement
   | Ret CStatement
   deriving (Show)
 
-
 toReturn :: (CStatement -> CExpr) -> Expression -> [CExpr]
 toReturn final input = case input of
   FCall name args ->

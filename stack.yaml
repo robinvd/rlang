@@ -1,13 +1,13 @@
-resolver: lts-8.20
+resolver: lts-9.0
 
 nix:
   enable: true
+  packages:
+    - llvm_4
 
 packages:
 - .
 extra-deps:
-  - llvm-hs-4.2.0
-  - llvm-hs-pure-4.2.0
 
 flags: {}
 
