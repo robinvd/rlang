@@ -5,7 +5,9 @@ nix:
 
 packages:
 - .
-extra-deps: []
+extra-deps:
+  - llvm-hs-4.2.0
+  - llvm-hs-pure-4.2.0
 
 flags: {}
 

@@ -43,7 +43,7 @@ variable = Var <$> identifier
 parseType :: Parser Type
 parseType = choice $ fmap try
   [ symbol "(" >> symbol ")" >> return TUnit
-  , do 
+  , do
     types <- parens . commaSep $ parseType
     return $ TTulple types
   , TVar <$> lowIdentifier
@@ -107,6 +107,11 @@ while = do
   reserved "end"
   return $ While cond body
 
+-- inline :: Parser TopLevel
+-- inline = do
+--   reserved "inline"
+--   Inline <$> quotedString
+
 factor :: Parser Expression
 factor = choice $ fmap try
     [ call
@@ -150,9 +155,8 @@ parseIf = do
   elsebody <- expr
   reserved "end"
   return $ If cond body elsebody
-  
 
 toplevel :: Parsec Text () [TopLevel]
-toplevel = many $ function <|> binDef <|> extern <|> imp
+toplevel = many $ function <|> binDef <|> extern <|> imp -- <|> inline
 
 parseTopLevel = parse (contents toplevel) "<stdin>"

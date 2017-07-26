@@ -10,7 +10,7 @@ data Prim
   | Unit
   deriving (Show)
 
-data Type 
+data Type
   = TType Text
   | TUnit
 
@@ -24,7 +24,7 @@ data Type
 
   -- TForall Text
 
-data Expression 
+data Expression
   = FCall Text [Expression]
   -- | BinOp Text Expression Expression
   -- | Lambda Type Text Expression

@@ -41,7 +41,7 @@ checkPrim p = case p of
   Num _ -> TType "Num"
   Tulple xs -> TTulple . fmap checkPrim $ xs
   Unit -> TUnit
-  
+
 -- lookupCheck :: Text -> Check Type
 -- lookupCheck x = do
 --   env <- ask
@@ -73,8 +73,8 @@ fits fargs input = f M.empty fargs input
     f env [] [] = Just env
     f env (TVar x:xs) (y:ys) = case M.lookup x env of
 
-      Just a -> if a == y 
-        then f env xs ys 
+      Just a -> if a == y
+        then f env xs ys
         else Nothing
       Nothing -> f (M.insert x y env) xs ys
     f env (x:xs) (y:ys) = case x == y of
@@ -83,7 +83,7 @@ fits fargs input = f M.empty fargs input
     f _ _ _ = Nothing
 
 check :: Map Text Type -> Expression -> Check Type
-check local expr = 
+check local expr =
   case expr of
 
     FCall name args -> do
@@ -91,7 +91,7 @@ check local expr =
       a <- mapM (check local) args -- [Type]
       let matched = fits ar a
 
-      case matched of 
+      case matched of
         Nothing -> throwError $ Mismatch (TArr a) (TArr ar)
         Just x -> case ret of
 
