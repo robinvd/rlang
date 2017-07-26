@@ -2,6 +2,8 @@ module Rlang.Jit where
 
 import Data.Int
 import Data.Word
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Short as B
 import Foreign.Ptr ( FunPtr, castFunPtr )
 
 import Control.Monad.Except
@@ -34,8 +36,8 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
 passes :: PassSetSpec
 passes = defaultPassSetSpec
   { transforms = 
-    [ FunctionAttributes
-    , AlwaysInline True
+    [ -- FunctionAttributes
+    AlwaysInline True
     , FunctionInlining 10
     , PromoteMemoryToRegister
     , InstructionCombining
@@ -47,20 +49,20 @@ passes = defaultPassSetSpec
     ]
   }
 
-runJIT :: AST.Module -> IO (Either String AST.Module)
+runJIT :: AST.Module -> IO (AST.Module)
 runJIT mod = do
   withContext $ \context ->
     jit context $ \executionEngine ->
-      runExceptT $ withModuleFromAST context mod $ \m ->
+      withModuleFromAST context mod $ \m ->
         withPassManager passes $ \pm -> do
           -- Optimization Pass
           runPassManager pm m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
-          putStrLn s
+          B.putStrLn s
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
-            mainfn <- EE.getFunction ee (AST.Name "main")
+            mainfn <- EE.getFunction ee (AST.mkName "main")
             case mainfn of
               Just fn -> do
                 res <- run fn

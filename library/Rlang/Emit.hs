@@ -34,7 +34,7 @@ codegenTop S.CFunc{..} =
       setBlock entry
       forM args $ \a -> do
         var <- alloca int
-        store var (local (AST.Name (T.unpack (fst a))))
+        store var (local (AST.mkName (T.unpack (fst a))))
         assign (fst a) var
       mapM cgen body -- >>= ret
 
@@ -59,7 +59,7 @@ prelude = do
       ret res
 
 toSig :: [Text] -> [(AST.Type, AST.Name)]
-toSig = map (\x -> (int, AST.Name (T.unpack x)))
+toSig = map (\x -> (int, AST.mkName (T.unpack x)))
 
 cgen :: S.CExpr -> Codegen AST.Operand
 cgen (S.CStatement st) = stCgen st
@@ -70,7 +70,7 @@ cgen (S.CScope body) = mapM cgen body >>= return . head
 stCgen :: S.CStatement -> Codegen AST.Operand
 stCgen (S.CCall fn args) = do
   largs <- mapM stCgen args
-  call (externf (AST.Name (T.unpack fn))) largs
+  call (externf (AST.mkName (T.unpack fn))) largs
 stCgen (S.CAssign var st) = do
   ptr <- getvar var
   res <- stCgen st
@@ -98,7 +98,7 @@ liftError = runExceptT >=> either fail return
 
 codegen :: AST.Module -> [S.CFunc] -> IO AST.Module
 codegen mod fns = withContext $ \context ->
-  liftError $ withModuleFromAST context newast $ \m -> do
+  withModuleFromAST context newast $ \m -> do
     llstr <- moduleLLVMAssembly m
     -- putStrLn llstr
     return newast

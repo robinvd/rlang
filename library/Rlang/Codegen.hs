@@ -6,9 +6,11 @@ module Rlang.Codegen where
 import Data.List
 import Data.Function
 import Data.Text (Text)
+import Data.String
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Data.Map as Map
+import qualified Data.ByteString.Short as B
 
 import Control.Monad.State
 
@@ -38,7 +40,7 @@ runLLVM :: AST.Module -> LLVM a -> AST.Module
 runLLVM modu (LLVM m) = execState m modu
 
 emptyModule :: String -> AST.Module
-emptyModule label = defaultModule { moduleName = label }
+emptyModule label = defaultModule { moduleName = fromString label }
 
 addDefn :: Definition -> LLVM ()
 addDefn d = do
@@ -48,7 +50,7 @@ addDefn d = do
 defineInline :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 defineInline retty label argtys body = addDefn $
   GlobalDefinition $ functionDefaults {
-    name        = Name label
+    name        = mkName label
   , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
   , returnType  = retty
   , basicBlocks = body
@@ -60,7 +62,7 @@ defineInline retty label argtys body = addDefn $
 define :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $
   GlobalDefinition $ functionDefaults {
-    name        = Name label
+    name        = mkName label
   , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
   , returnType  = retty
   , basicBlocks = body
@@ -69,7 +71,7 @@ define retty label argtys body = addDefn $
 external ::  Type -> String -> [(Type, Name)] -> LLVM ()
 external retty label argtys = addDefn $
   GlobalDefinition $ functionDefaults {
-    name        = Name label
+    name        = mkName label
   , linkage     = L.External
   , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
   , returnType  = retty
@@ -82,7 +84,7 @@ external retty label argtys = addDefn $
 
 -- IEEE 754 double
 double :: Type
-double = FloatingPointType 64 IEEE
+double = FloatingPointType DoubleFP
 
 int :: Type
 int = IntegerType 64
@@ -148,7 +150,7 @@ emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState (Name (T.unpack entryBlockName)) Map.empty [] 1 0 Map.empty
+emptyCodegen = CodegenState (mkName (T.unpack entryBlockName)) Map.empty [] 1 0 Map.empty
 
 execCodegen :: Codegen a -> CodegenState
 execCodegen m = execState (runCodegen m) emptyCodegen
@@ -190,11 +192,11 @@ addBlock bname = do
   let new = emptyBlock ix
       (qname, supply) = uniqueName bname nms
 
-  modify $ \s -> s { blocks = Map.insert (Name (T.unpack qname)) new bls
+  modify $ \s -> s { blocks = Map.insert (mkName (T.unpack qname)) new bls
                    , blockCount = ix + 1
                    , names = supply
                    }
-  return (Name (T.unpack qname))
+  return (mkName (T.unpack qname))
 
 setBlock :: Name -> Codegen Name
 setBlock bname = do
