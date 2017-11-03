@@ -1,8 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 module Rlang.Run where
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import qualified Data.Map as M
 import System.IO
+import Text.Pretty.Simple (pPrint)
 
 import Rlang.Parsing
 import Rlang.Scan
@@ -17,17 +21,28 @@ run1 inp = do
   cont <- readFile inp
   Rlang.Run.run $ T.pack cont
 
+isLeft (Left _) = True
+isLeft _ = False
+
 run :: T.Text -> IO ()
 run input = do
   let syntaxTree = parseTopLevel input
   case syntaxTree of
     Left err -> print err
     Right x -> do
-      hPrint stderr x
-      -- print $ fmap (runCheck (scanTop x)) (getBodys x)
-      -- print $ fmap (checkTop (scanTop x)) (getFuncs x)
-      -- print $ fmap (\a -> (== getRetType a) <$> checkTop (scanTop x) a) (getFuncs x)
-      hPrint stderr $ toCore x
-      a <- codegen (emptyModule "test") (toCore x)
-      runJIT a
-      return ()
+      pPrint x
+      let n = TType "Num"
+          scan :: Env
+          scan = scanTop x `M.union` M.fromList [("+", TFunc n [n, n])]
+          typeCheck = fmap (checkTop scan) x
+          -- errs = filter isLeft $ concat typeCheck
+      pPrint $ typeCheck
+      case any isLeft (concat typeCheck) of
+        True -> putStrLn "type Error"
+        False -> do
+          putStrLn "program type checks"
+          let core = toCore scan x
+          pPrint core
+          a <- codegen (emptyModule "test") core
+          runJIT a
+          return ()

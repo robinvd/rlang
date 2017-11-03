@@ -4,8 +4,9 @@
 
 module Rlang.Parsing where
 
-import           Text.Parsec ((<|>), many, Parsec, ParsecT, choice, parse, eof, try, optionMaybe)
+import           Text.Parsec ((<|>), many, Parsec, choice, parse, eof, try, ParseError)
 import           Text.Parsec.Text ()
+import           Text.Parsec.Combinator
 import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 import           Data.Text (Text)
@@ -21,7 +22,11 @@ int :: Parser Expression
 int = Lit . Num . fromInteger <$> integer
 
 str :: Parser Expression
-str = Lit . String <$>  quotedString
+str = Lit . String <$> quotedString
+
+
+char :: Parser Expression
+char = Lit . Char <$> charLit
 
 binop = Ex.Infix ((\x y z -> FCall x [y,z]) <$> operator) Ex.AssocRight
 
@@ -34,15 +39,23 @@ binary s assoc = Ex.Infix (reservedOp s >> return ((\x y z -> FCall x [y,z]) (T.
 --           binary "-" Minus Ex.AssocLeft]]
 binops = [[binary "=" Ex.AssocLeft]] -- [[binary ";" Semi Ex.AssocLeft]]
 
-expr :: Parser Expression
-expr = Ex.buildExpressionParser (binops ++ [[binop]]) factor
+exprSingle :: Parser Expression
+exprSingle  = Ex.buildExpressionParser (binops ++ [[binop]]) factor
+
+expr :: Parser [Expression]
+expr = sepBy1 exprSingle (symbol ";")
 
 variable :: Parser Expression
 variable = Var <$> identifier
 
 parseType :: Parser Type
 parseType = choice $ fmap try
-  [ symbol "(" >> symbol ")" >> return TUnit
+  [ symbol "()"  >> return TUnit
+  , try $ do
+    args <- parens . commaSep $ parseType
+    symbol "->"
+    t <- parseType
+    return $ TFunc t args
   , do
     types <- parens . commaSep $ parseType
     return $ TTulple types
@@ -60,7 +73,7 @@ function :: Parser TopLevel
 function = do
   name <- identifier
   args <- parens . commaSep $ varType
-  symbol ":"
+  symbol "->"
   t <- parseType
   symbol "="
   body <- expr
@@ -72,11 +85,11 @@ binDef = do
   prio <- integer
   name <- operator
   args <- parens . commaSep $ varType
-  symbol ":"
+  symbol "->"
   t <- parseType
   symbol "="
   body <- expr
-  return $ Binary t name args body
+  return $ Function t name args body
 
 -- semiExpr :: Parser Expression
 -- semiExpr = do
@@ -87,7 +100,7 @@ binDef = do
 call :: Parser Expression
 call = do
   name <- identifier
-  args <- parens . commaSep $ expr
+  args <- parens . commaSep $ exprSingle
   return $ FCall name args
 
 letbinding :: Parser Expression
@@ -95,7 +108,7 @@ letbinding = try $ do
   reserved "let"
   (name, t) <- varType
   reservedOp "="
-  val <- expr
+  val <- exprSingle
   body <- expr
   return $ Let name t val body
 
@@ -117,9 +130,10 @@ factor = choice $ fmap try
     [ call
     , int
     , str
+    , char
     , variable
-    , parens expr
-    -- , for
+    -- , parens expr
+    , symbol "()" >> return (Lit Unit)
     ] ++ [parseIf, while, letbinding]
 
 contents :: Parsec Text () a -> Parsec Text () a
@@ -159,4 +173,5 @@ parseIf = do
 toplevel :: Parsec Text () [TopLevel]
 toplevel = many $ function <|> binDef <|> extern <|> imp -- <|> inline
 
+parseTopLevel :: Text -> Either ParseError [TopLevel]
 parseTopLevel = parse (contents toplevel) "<stdin>"

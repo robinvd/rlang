@@ -25,6 +25,7 @@ import qualified LLVM.AST.Visibility as V
 import qualified LLVM.AST.CallingConvention as CC
 import qualified LLVM.AST.FunctionAttribute as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
+import qualified LLVM.AST.IntegerPredicate as IP
 
 tShow :: Show a => a -> Text
 tShow = T.pack . show
@@ -88,6 +89,9 @@ double = FloatingPointType DoubleFP
 
 int :: Type
 int = IntegerType 64
+
+bool :: Type
+bool = IntegerType 1
 
 -------------------------------------------------------------------------------
 -- Names
@@ -263,6 +267,9 @@ fdiv a b = instr $ FDiv NoFastMathFlags a b []
 fcmp :: FP.FloatingPointPredicate -> Operand -> Operand -> Codegen Operand
 fcmp cond a b = instr $ FCmp cond a b []
 
+icmp :: IP.IntegerPredicate -> Operand -> Operand -> Codegen Operand
+icmp cond a b = instr $ ICmp cond a b []
+
 cons :: C.Constant -> Operand
 cons = ConstantOperand
 
@@ -291,6 +298,9 @@ br val = terminator $ Do $ Br val []
 
 cbr :: Operand -> Name -> Name -> Codegen (Named Terminator)
 cbr cond tr fl = terminator $ Do $ CondBr cond tr fl []
+
+phi :: Type -> [(Operand, Name)] -> Codegen Operand
+phi ty incoming = instr $ Phi ty incoming []
 
 ret :: Operand -> Codegen (Named Terminator)
 ret val = terminator $ Do $ Ret (Just val) []

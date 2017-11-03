@@ -30,20 +30,22 @@ data Expression
   -- | Lambda Type Text Expression
   | Var Text
   | Lit Prim
-  | Let Text Type Expression Expression
-  | If Expression Expression Expression
-  | While Expression Expression
+
+  -- name retType assignment letBody
+  | Let Text Type Expression [Expression]
+  | If [Expression] [Expression] [Expression]
+  | While [Expression] [Expression]
   deriving (Show)
 
 data TopLevel
 
   -- define a new function
   -- retType Name arguments body
-  = Function Type Text [(Text, Type)] Expression
+  = Function Type Text [(Text, Type)] [Expression]
 
   -- define a new binary function
   -- retType name arguments body
-  | Binary Type Text [(Text, Type)] Expression
+  -- | Binary Type Text [(Text, Type)] Expression
 
   -- package retType fName argTypes
   | Extern Text Type Text [Type]

@@ -8,7 +8,7 @@ module Rlang.Lexer where
 import Text.Parsec (ParsecT, Stream, (<|>), many)
 import Text.Parsec.Char
 import Text.Parsec.Text ()
-import qualified Data.Text as T (pack, cons)
+import qualified Data.Text as T (pack)
 import           Data.Text (Text)
 
 import qualified Text.Parsec.Token as Tok
@@ -22,7 +22,7 @@ myDef = Tok.LanguageDef
                , Tok.identStart     = letter <|> char '_'
                , Tok.identLetter    = alphaNum <|> oneOf "_'."
                , Tok.opStart        = Tok.opLetter myDef
-               , Tok.opLetter       = oneOf ":;!#$%&*+./<=>?@\\^|-~"
+               , Tok.opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
                , Tok.reservedOpNames= []
                , Tok.reservedNames  = []
                , Tok.caseSensitive  = True
@@ -44,6 +44,9 @@ integer = Tok.integer lexer
 
 quotedString :: Stream s m Char => ParsecT s u m Text
 quotedString = T.pack <$> Tok.stringLiteral lexer
+
+charLit :: Stream s m Char => ParsecT s u m Char
+charLit = Tok.charLiteral lexer
 
 parens :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
 parens = Tok.parens lexer

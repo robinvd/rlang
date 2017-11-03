@@ -9,6 +9,7 @@ import qualified Data.Text as T
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad
+import Control.Applicative
 
 import Rlang.Syntax
 
@@ -20,7 +21,7 @@ scanTop = mconcat . fmap scan
 scan :: TopLevel -> Env
 scan x = case x of
   Function ret name args _ -> M.singleton name (TFunc ret (map snd args))
-  Binary ret name args expr -> scan $ Function ret name args expr
+  -- Binary ret name args expr -> scan $ Function ret name args expr
   Extern _ ret name args -> M.singleton name (TFunc ret args)
   Import package -> M.empty -- TODO
 
@@ -59,11 +60,18 @@ lookupF local x = case M.lookup x local of
       Just a -> return a
       Nothing -> throwError $ NotInScope $ T.append x $ T.pack $ show local
 
-checkT :: TopLevel -> Check Type
+checkT :: TopLevel -> [Check Type]
 checkT x = case x of
 
-  Function ret name args body -> check (M.fromList args) body
-  _ -> throwError $ InteralError "Not a function"
+  Function ret name args body -> map (check (M.fromList args)) body ++ [funcSigCheck]
+    where
+      funcSigCheck = f =<< check (M.fromList args) (last body)
+      f :: Type -> Check Type
+      f x
+        | x == ret = return x
+        | otherwise = throwError $ Mismatch x ret
+        
+  _ -> return $ throwError $ InteralError "Not a function"
 
 fits :: [Type] -> [Type] -> Maybe (Map Text Type)
 fits fargs input = f M.empty fargs input
@@ -111,9 +119,10 @@ check local expr =
     -- Assignment _ _ -> return TUnit
 
     If p t f -> do
-      p' <- check local p
-      t' <- check local t
-      f' <- check local f
+      -- TODO not just the last one
+      p' <- check local (last p)
+      t' <- check local (last t)
+      f' <- check local (last f)
       unless (p' /= TType "Bool") $ throwError $ Mismatch (TType "Bool") p'
       unless (t' == f') $ throwError $ Mismatch t' f'
       return t'
@@ -121,5 +130,5 @@ check local expr =
 runCheck :: Env -> Check a -> Either TypeError a
 runCheck env = flip runReader env . runExceptT
 
-checkTop :: Env -> TopLevel -> Either TypeError Type
-checkTop env x = runCheck env $ checkT x
+checkTop :: Env -> TopLevel -> [Either TypeError Type]
+checkTop env x = map (runCheck env) (checkT x)

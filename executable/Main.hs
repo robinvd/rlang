@@ -10,6 +10,7 @@ main = do
   args <- getArgs
   case args of
     [] -> T.getContents >>= run
-    xs -> mapM_ (\x -> run =<< T.readFile x) xs
+    x:_ -> T.readFile x >>= run
+    -- xs -> mapM_ (\x -> run =<< T.readFile x) xs
 
 
