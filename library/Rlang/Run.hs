@@ -16,10 +16,19 @@ import Rlang.Codegen
 import Rlang.Core
 import Rlang.Jit
 
-run1 :: String -> IO ()
-run1 inp = do
-  cont <- readFile inp
-  Rlang.Run.run $ T.pack cont
+-- | TODO
+--   overall todo list
+--   FIXES
+--   - actually start a new scope in Emit/cgen
+--   - function pointers
+--   - void type in llvm instead of int 1
+--   - externs
+--
+--   feature list
+--   - structs/data + types
+--   - classes/polymophism
+--   - clib
+--   - ability to include llvm/c/asm code
 
 isLeft (Left _) = True
 isLeft _ = False
@@ -31,7 +40,7 @@ run input = do
     Left err -> print err
     Right x -> do
       pPrint x
-      let n = TType "Num"
+      let n = TType "Num" []
           scan :: Env
           scan = scanTop x `M.union` M.fromList [("+", TFunc n [n, n])]
           typeCheck = fmap (checkTop scan) x
@@ -43,6 +52,6 @@ run input = do
           putStrLn "program type checks"
           let core = toCore scan x
           pPrint core
-          a <- codegen (emptyModule "test") core
+          a <- codegen scan (emptyModule "test") core
           runJIT a
           return ()

@@ -6,17 +6,16 @@ data Prim
   = String Text
   | Char Char
   | Num Int
-  | Tulple [Prim]
+  -- | Tulple [Expression]
   | Unit
   deriving (Show)
 
 data Type
-  = TType Text
+  = TType Text [Type]
   | TUnit
-
   -- variable in a type ex. forall a. a -> a
   | TVar Text
-  | TTulple [Type]
+  | TStruct Text [Type]
   | TArr [Type]
   | TFunc Type [Type]
   deriving (Show, Eq)
@@ -30,6 +29,7 @@ data Expression
   -- | Lambda Type Text Expression
   | Var Text
   | Lit Prim
+  | Struct Text [Expression]
 
   -- name retType assignment letBody
   | Let Text Type Expression [Expression]

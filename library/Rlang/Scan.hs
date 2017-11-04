@@ -34,14 +34,16 @@ data TypeError
 
 type Check = ExceptT TypeError (Reader Env)
 
-checkPrim :: Prim -> Type
-checkPrim p = case p of
+checkPrim :: Env -> Prim -> Check Type
+checkPrim env p = case p of
 
-  String _ -> TType "String"
-  Char _ -> TType "Char"
-  Num _ -> TType "Num"
-  Tulple xs -> TTulple . fmap checkPrim $ xs
-  Unit -> TUnit
+  String _ -> return $ TType "String" []
+  Char _ -> return $ TType "Char" []
+  Num _ -> return $ TType "Num" []
+  -- Tulple xs -> do
+    -- types <- mapM (check env ) xs
+    -- return $ TTulple types
+  Unit -> return $ TUnit
 
 -- lookupCheck :: Text -> Check Type
 -- lookupCheck x = do
@@ -70,6 +72,7 @@ checkT x = case x of
       f x
         | x == ret = return x
         | otherwise = throwError $ Mismatch x ret
+  Extern pkgs ret name args -> return $ return ret
         
   _ -> return $ throwError $ InteralError "Not a function"
 
@@ -114,8 +117,12 @@ check local expr =
 
     Var name -> lookupF local name
 
-    Lit prim -> return $ checkPrim prim
+    Lit prim -> checkPrim local prim
 
+    Struct name xs -> 
+      return .TStruct name =<< mapM (check local) xs
+
+    Let varName t val rest -> check (M.insert varName t local) (last rest)
     -- Assignment _ _ -> return TUnit
 
     If p t f -> do
@@ -123,7 +130,7 @@ check local expr =
       p' <- check local (last p)
       t' <- check local (last t)
       f' <- check local (last f)
-      unless (p' /= TType "Bool") $ throwError $ Mismatch (TType "Bool") p'
+      unless (p' /= TType "Bool" []) $ throwError $ Mismatch (TType "Bool" []) p'
       unless (t' == f') $ throwError $ Mismatch t' f'
       return t'
 

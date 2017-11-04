@@ -5,14 +5,18 @@ module Rlang.Codegen where
 
 import Data.List
 import Data.Function
+import Data.Functor.Identity (Identity)
 import Data.Text (Text)
 import Data.String
+import qualified Data.Map as M
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Data.Map as Map
 import qualified Data.ByteString.Short as B
 
 import Control.Monad.State
+import Control.Monad.Reader (ReaderT, runReaderT, ask)
+import Control.Monad.Identity
 
 import LLVM.AST
 import LLVM.AST.Global
@@ -26,6 +30,8 @@ import qualified LLVM.AST.CallingConvention as CC
 import qualified LLVM.AST.FunctionAttribute as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.IntegerPredicate as IP
+
+import Rlang.Scan
 
 tShow :: Show a => a -> Text
 tShow = T.pack . show
@@ -50,13 +56,13 @@ addDefn d = do
 
 defineInline :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 defineInline retty label argtys body = addDefn $
-  GlobalDefinition $ functionDefaults {
-    name        = mkName label
+  GlobalDefinition $ functionDefaults 
+  { name        = mkName label
   , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
   , returnType  = retty
   , basicBlocks = body
-  , AST.functionAttributes = [Right F.AlwaysInline]
-  , visibility = V.Hidden
+  , LLVM.AST.Global.functionAttributes = [Right F.AlwaysInline ] --Left (F.GroupID 1)]
+  -- , visibility = V.Hidden
   }
 
 
@@ -114,8 +120,9 @@ type SymbolTable = [(Text, Operand)]
 data CodegenState
   = CodegenState {
     currentBlock :: Name                     -- Name of the active block to append to
-  , blocks       :: Map.Map Name BlockState  -- Blocks for function
-  , symtab       :: SymbolTable              -- Function scope symbol table
+  , blocks       :: M.Map Name BlockState  -- Blocks for function
+  , symtab       :: M.Map Text Operand
+  , globalTable  :: M.Map Text Type
   , blockCount   :: Int                      -- Count of basic blocks
   , count        :: Word                     -- Count of unnamed instructions
   , names        :: Names                    -- Name Supply
@@ -132,8 +139,10 @@ data BlockState
 -- Codegen Operations
 -------------------------------------------------------------------------------
 
-newtype Codegen a = Codegen { runCodegen :: State CodegenState a }
-  deriving (Functor, Applicative, Monad, MonadState CodegenState )
+newtype CodegenT m a = CodegenT { runCodegen :: StateT CodegenState m a }
+  deriving (Functor, Applicative, Monad, MonadState CodegenState)
+
+type Codegen = CodegenT Identity
 
 sortBlocks :: [(Name, BlockState)] -> [(Name, BlockState)]
 sortBlocks = sortBy (compare `on` (idx . snd))
@@ -154,10 +163,17 @@ emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState (mkName (T.unpack entryBlockName)) Map.empty [] 1 0 Map.empty
+emptyCodegen = CodegenState 
+  (mkName (T.unpack entryBlockName))
+  M.empty
+  M.empty
+  M.empty
+  1
+  0 
+  M.empty
 
-execCodegen :: Codegen a -> CodegenState
-execCodegen m = execState (runCodegen m) emptyCodegen
+execCodegen :: M.Map Text Type -> Codegen a -> CodegenState
+execCodegen env m = execState (runCodegen m) emptyCodegen {globalTable = env}
 
 fresh :: Codegen Word
 fresh = do
@@ -230,20 +246,29 @@ current = do
 assign :: Text -> Operand -> Codegen ()
 assign var x = do
   lcls <- gets symtab
-  modify $ \s -> s { symtab = [(var, x)] ++ lcls }
+  modify $ \s -> s { symtab = M.insert var x lcls }
 
 getvar :: Text -> Codegen Operand
 getvar var = do
   syms <- gets symtab
-  case lookup var syms of
+  global <- gets globalTable
+  case M.lookup var syms of
     Just x  -> return x
-    Nothing -> error $ "Local variable not in scope: " ++ show var
+    Nothing -> case M.lookup var global of
+                 Just x -> do
+                   al <- alloca x
+                   store al (externf (AST.mkName (T.unpack var)))
+                   return al
+                 _ -> error $ "Local variable not in scope: " ++ show var
 
 -------------------------------------------------------------------------------
 
 -- References
 local ::  Name -> Operand
 local = LocalReference int
+
+localf :: Name -> Operand
+localf = LocalReference double
 
 global ::  Name -> C.Constant
 global = C.GlobalReference double

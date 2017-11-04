@@ -5,6 +5,7 @@ module Rlang.Core where
 
 import Data.Maybe
 import qualified Data.Map as M
+import qualified LLVM.AST.Type as T
 -- import Data.Char (isAlpha)
 import Data.Text (Text)
 -- import qualified Data.Text as T
@@ -29,48 +30,30 @@ data CBlock = CBlock
   deriving (Show)
 
 data CExpr
-  = CWhile CBlock CBlock
-  | CIf CBlock CBlock CBlock
-  | CScope CBlock
-  | CCall Text [CBlock]
+  = CCall Text [CBlock]
+  | CInit Text Type
   | CAssign Text CBlock
   | CLit Prim
+  -- name llvmType items
+  | CStruct Text T.Type [CBlock]
   | CVar Text
-  | CInit Text Type
+  | CWhile CBlock CBlock
+  | CIf CBlock CBlock CBlock
+  | CScope CBlock
 -- | Ret CStatement
   deriving (Show)
 
--- toReturn :: (CStatement -> CExpr) -> Expression -> [CExpr]
--- toReturn final input = case input of
---   FCall name args ->
---     let a = zip3 [0..] args (repeat $ TType "Int") in
---       return $ CScope $ concatMap parseArgs a <>
---         [final (CCall name (map (CVar . parseCall) (map fst3 a)))]
---   Var x -> [final $ CVar x]
---   Lit x -> [final $ CLit x]
---   -- TODO make new scope
---   Let var t val body ->
---     [ CStatement $ CInit var t]
---     ++ toReturn (CStatement . CAssign var) val
---     ++ toReturn final body
---   If cond t f -> return . CScope $
---     [CStatement (CInit "_cond" (TType "Int"))] ++
---     toReturn (CStatement . CAssign "_cond") cond ++
---     [CIf (CVar "_cond") (toReturn final t) (toReturn final f)]
---   While cond body -> return . CScope $
---     [CStatement (CInit "_cond" (TType "Int"))] ++
---     toReturn (CStatement . CAssign "_cond") cond ++
---     [CWhile (CVar "_cond") (toReturn final body)]
---   where
---     fst3 (a,_,_) = a
---     parseArgs :: (Int, Expression, Type) -> [CExpr]
---     parseArgs (num, arg, t) =
---       let name = "_arg" <> (T.pack . show $ num) in
---         CStatement (CInit name t) :
---         toReturn (CStatement . CAssign name)
---             arg
---     parseCall :: Int -> Text
---     parseCall x = "_arg" <> (T.pack . show $ x)
+typeToLLVM :: Type -> T.Type
+typeToLLVM t = case t of
+                 TType "Char" [] -> T.IntegerType 8
+                 TType "Num" [] -> T.IntegerType 64
+                 -- S.TUnit -> VoidType
+                 TUnit -> T.IntegerType 1
+                 TFunc ret args -> T.ptr $
+                   T.FunctionType (typeToLLVM ret) (map typeToLLVM args) False
+                 TType "Ptr" [x] -> T.ptr (typeToLLVM x)
+                 TStruct _ xs -> T.StructureType False (map typeToLLVM xs)
+                 _ -> error "Unkown type"
 
 toCore :: Env -> [TopLevel] -> Core
 toCore env = mapMaybe f
@@ -90,9 +73,14 @@ syntaxToCore env local body = CBlock (typeOf env local body) (map single body)
             FCall name b -> CCall name (map (syntaxToCore env local) (map (:[]) b))
             Var name -> CVar name
             Lit pr -> CLit pr
-            Let varName varType varVal b -> CScope body
+            Struct name fields -> 
+              CStruct 
+                name 
+                (typeToLLVM $ typeOf env local [Struct name fields])
+                (map (syntaxToCore env local . (:[])) fields)
+            Let varName varType varVal b -> CScope letBody
               where
-                body = CBlock (typeOf env local b) $ 
+                letBody = CBlock (typeOf env local b) $ 
                   [ CInit varName varType
                   , CAssign varName (syntaxToCore env local [varVal])]
                   ++ map single b
@@ -114,7 +102,13 @@ typeOf :: Env -> Env -> [Expression] -> Type
 typeOf env local body = case last body of
                           FCall name _ -> findType env local name
                           Var name -> findType env local name
-                          Lit pr -> checkPrim pr
+                          Lit pr -> case runCheck env (checkPrim local pr) of
+                                      Left x -> error $ show x
+                                      Right x -> x
+                          Struct name fields -> 
+                            case runCheck env (mapM (check local) fields) of
+                              Left x -> error $ show x
+                              Right x -> TStruct name x
                           Let varName t _ b -> 
                             typeOf env (M.insert varName t local) b
                           If _ t _ -> typeOf env local t

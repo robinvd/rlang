@@ -58,9 +58,13 @@ parseType = choice $ fmap try
     return $ TFunc t args
   , do
     types <- parens . commaSep $ parseType
-    return $ TTulple types
+    return $ TStruct "Tulple" types
   , TVar <$> lowIdentifier
-  , TType <$> capIdentifier]
+  , do
+    main <- capIdentifier
+    rest <- many parseType
+    return $ TType main rest
+  ]
 
 varType :: Parser (Text, Type)
 varType = do
@@ -134,6 +138,9 @@ factor = choice $ fmap try
     , variable
     -- , parens expr
     , symbol "()" >> return (Lit Unit)
+    , do
+      x <- parens . commaSep $ factor
+      return . Struct "Tulple" $ x
     ] ++ [parseIf, while, letbinding]
 
 contents :: Parsec Text () a -> Parsec Text () a
@@ -149,8 +156,9 @@ extern = do
   package <- quotedString
   name <- identifier
   args <- parens . commaSep $ parseType
-  symbol ":"
+  symbol "->"
   retType <- parseType
+  symbol ";"
   return $ Extern package retType name args
 
 imp :: Parser TopLevel

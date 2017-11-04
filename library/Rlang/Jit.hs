@@ -36,16 +36,17 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
 passes :: PassSetSpec
 passes = defaultPassSetSpec
   { transforms = 
-    [ -- FunctionAttributes
+    [ 
+    -- FunctionAttributes
     AlwaysInline True
-    , FunctionInlining 10
-    , PromoteMemoryToRegister
-    , InstructionCombining
-    , ConstantPropagation
-    , DeadCodeElimination
-    , AggressiveDeadCodeElimination
-    , GlobalDeadCodeElimination
-    , TailCallElimination
+    -- , FunctionInlining 10
+    -- , PromoteMemoryToRegister
+    -- , InstructionCombining
+    -- , ConstantPropagation
+    -- , DeadCodeElimination
+    -- , AggressiveDeadCodeElimination
+    -- , GlobalDeadCodeElimination
+    -- , TailCallElimination
     ]
   }
 
@@ -53,13 +54,15 @@ runJIT :: AST.Module -> IO (AST.Module)
 runJIT mod = do
   withContext $ \context ->
     jit context $ \executionEngine ->
-      withModuleFromAST context mod $ \m ->
+      withModuleFromAST context mod $ \m -> do
         withPassManager passes $ \pm -> do
           -- Optimization Pass
           runPassManager pm m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
           B.putStrLn s
+          B.writeFile "out.ll" s
+          verify m
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
             mainfn <- EE.getFunction ee (AST.mkName "main")
