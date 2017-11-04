@@ -32,6 +32,7 @@ import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.IntegerPredicate as IP
 
 import Rlang.Scan
+import qualified Rlang.MapStack as MS
 
 tShow :: Show a => a -> Text
 tShow = T.pack . show
@@ -118,11 +119,12 @@ uniqueName nm ns =
 type SymbolTable = [(Text, Operand)]
 
 data CodegenState
-  = CodegenState {
-    currentBlock :: Name                     -- Name of the active block to append to
+  = CodegenState 
+  { currentBlock :: Name                     -- Name of the active block to append to
   , blocks       :: M.Map Name BlockState  -- Blocks for function
-  , symtab       :: M.Map Text Operand
-  , globalTable  :: M.Map Text Type
+  -- , symtab       :: M.Map Text Operand
+  -- , globalTable  :: M.Map Text Type
+  , symtab       :: MS.MapStack Text Operand
   , blockCount   :: Int                      -- Count of basic blocks
   , count        :: Word                     -- Count of unnamed instructions
   , names        :: Names                    -- Name Supply
@@ -166,14 +168,13 @@ emptyCodegen :: CodegenState
 emptyCodegen = CodegenState 
   (mkName (T.unpack entryBlockName))
   M.empty
-  M.empty
-  M.empty
+  undefined
   1
   0 
   M.empty
 
-execCodegen :: M.Map Text Type -> Codegen a -> CodegenState
-execCodegen env m = execState (runCodegen m) emptyCodegen {globalTable = env}
+execCodegen :: M.Map Text Operand -> Codegen a -> CodegenState
+execCodegen env m = execState (runCodegen m) emptyCodegen {symtab = MS.fromSingle env}
 
 fresh :: Codegen Word
 fresh = do
@@ -246,20 +247,20 @@ current = do
 assign :: Text -> Operand -> Codegen ()
 assign var x = do
   lcls <- gets symtab
-  modify $ \s -> s { symtab = M.insert var x lcls }
+  modify $ \s -> s { symtab = MS.insert var x lcls }
 
 getvar :: Text -> Codegen Operand
 getvar var = do
   syms <- gets symtab
-  global <- gets globalTable
-  case M.lookup var syms of
+  case MS.lookup var syms of
     Just x  -> return x
-    Nothing -> case M.lookup var global of
-                 Just x -> do
-                   al <- alloca x
-                   store al (externf (AST.mkName (T.unpack var)))
-                   return al
-                 _ -> error $ "Local variable not in scope: " ++ show var
+    Nothing -> error $ "variable not in scope: " ++ show var
+    -- Nothing -> case M.lookup var global of
+                 -- Just x -> do
+                   -- al <- alloca x
+                   -- store al (externf (AST.mkName (T.unpack var)))
+                   -- return al
+                 -- _ -> error $ "Local variable not in scope: " ++ show var
 
 -------------------------------------------------------------------------------
 

@@ -19,6 +19,7 @@ import Rlang.Jit
 -- | TODO
 --   overall todo list
 --   FIXES
+--   - letbinding/new variable keyword
 --   - actually start a new scope in Emit/cgen
 --   - function pointers
 --   - void type in llvm instead of int 1

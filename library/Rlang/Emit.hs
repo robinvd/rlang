@@ -31,6 +31,7 @@ import Rlang.Scan (Env)
 import qualified Rlang.Core as S
 import Rlang.Core (typeToLLVM)
 import qualified Rlang.Syntax as S
+import qualified Rlang.MapStack as MS
 
 
 codegenTop :: Env -> S.CFunc -> LLVM ()
@@ -79,19 +80,14 @@ prelude = do
 toSig :: [(Text, S.Type)] -> [(AST.Type, AST.Name)]
 toSig = map (\(x,t) -> (typeToLLVM t, AST.mkName (T.unpack x)))
 
-type NameStack = [Env]
-
-nsLookup :: Text -> NameStack -> Maybe S.Type
-nsLookup key = foldr (<|>) Nothing  . map (M.lookup key)
-
-cgen :: Env -> S.CBlock -> Codegen AST.Operand
+cgen :: S.CBlock -> Codegen AST.Operand
 cgen envv S.CBlock {..} = last <$> mapM (gen (envv)) blockBody
   where
     isLocal :: Env -> Text -> Bool
     isLocal env name = case M.lookup name env of
                          Just _ -> True
                          _ -> False
-    gen :: Env -> S.CExpr -> Codegen AST.Operand
+    gen :: S.CExpr -> Codegen AST.Operand
     gen local expr = case expr of
                  S.CCall fn args -> do
                    largs <- mapM (cgen local) args
@@ -103,13 +99,13 @@ cgen envv S.CBlock {..} = last <$> mapM (gen (envv)) blockBody
                      False -> call (externf (AST.mkName (T.unpack fn))) largs
                  (S.CAssign var st) -> do
                    ptr <- getvar var
-                   res <- cgen local st
+                   res <- cgen st
                    store ptr res
-                 (S.CLit pr) -> primCgen local pr
+                 (S.CLit pr) -> primCgen pr
                  S.CStruct name t fields -> do
                    global <- gets globalTable
                    ptr <- alloca t
-                   parts <- mapM (cgen local) fields
+                   parts <- mapM (cgen ) fields
                    forM (zip [0..] parts) $ \(i, v) -> do
                      indexPtr <- instr $ GetElementPtr True ptr [cons (C.Int 64 i)] []
                      store indexPtr v
@@ -120,7 +116,7 @@ cgen envv S.CBlock {..} = last <$> mapM (gen (envv)) blockBody
                    assign name var
                    return var
                  -- TODO actually make a new scope
-                 S.CScope bl -> cgen local bl
+                 S.CScope bl -> cgen bl
                  S.CIf cond tr fl -> do
                    ifthen <- addBlock "if.then"
                    ifelse <- addBlock "if.else"
@@ -128,21 +124,21 @@ cgen envv S.CBlock {..} = last <$> mapM (gen (envv)) blockBody
 
                    -- %entry
                    ------------------
-                   cond <- cgen local cond
+                   cond <- cgen cond
                    test <- icmp IP.EQ (cons $ C.Int 64 0) cond
                    cbr test ifthen ifelse -- Branch based on the condition
 
                    -- if.then
                    ------------------
                    setBlock ifthen
-                   trval <- cgen local tr       -- Generate code for the true branch
+                   trval <- cgen tr       -- Generate code for the true branch
                    br ifexit              -- Branch to the merge block
                    ifthen <- getBlock
 
                    -- if.else
                    ------------------
                    setBlock ifelse
-                   flval <- cgen local fl       -- Generate code for the false branch
+                   flval <- cgen fl       -- Generate code for the false branch
                    br ifexit              -- Branch to the merge block
                    ifelse <- getBlock
 
@@ -157,11 +153,11 @@ cgen envv S.CBlock {..} = last <$> mapM (gen (envv)) blockBody
                  --   ret s
                  --   return s
 
-primCgen :: Env -> S.Prim -> Codegen AST.Operand
+primCgen :: S.Prim -> Codegen AST.Operand
 -- primCGen (String str) =
-primCgen env (S.Char ch) = return $ cons $ C.Int 8 (toInteger $ fromEnum ch)
-primCgen env (S.Num i) = return $ cons $ C.Int 64 (toInteger i)
-primCgen env (S.Unit) = return $ cons $ C.Int 1 0
+primCgen (S.Char ch) = return $ cons $ C.Int 8 (toInteger $ fromEnum ch)
+primCgen (S.Num i) = return $ cons $ C.Int 64 (toInteger i)
+primCgen (S.Unit) = return $ cons $ C.Int 1 0
 -- primCGen env (S.Tulple xs) = do
   -- parts <- mapM (cgen env) xs
   -- return $ C.Struct Nothing True parts

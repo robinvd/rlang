@@ -46,6 +46,7 @@ library
       Rlang.Run
       Rlang.Scan
       Rlang.Syntax
+      Rlang.MapStack
   other-modules:
       Paths_rlang
   default-language: Haskell2010
