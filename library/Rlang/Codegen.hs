@@ -124,11 +124,11 @@ data CodegenState
   , blocks       :: M.Map Name BlockState  -- Blocks for function
   -- , symtab       :: M.Map Text Operand
   -- , globalTable  :: M.Map Text Type
-  , symtab       :: MS.MapStack Text Operand
+  , symtab       :: MS.MapStack Text (Codegen Operand)
   , blockCount   :: Int                      -- Count of basic blocks
   , count        :: Word                     -- Count of unnamed instructions
   , names        :: Names                    -- Name Supply
-  } deriving Show
+  } -- deriving Show
 
 data BlockState
   = BlockState {
@@ -174,7 +174,7 @@ emptyCodegen = CodegenState
   M.empty
 
 execCodegen :: M.Map Text Operand -> Codegen a -> CodegenState
-execCodegen env m = execState (runCodegen m) emptyCodegen {symtab = MS.fromSingle env}
+execCodegen env m = execState (runCodegen m) emptyCodegen {symtab = return <$> MS.fromSingle env}
 
 fresh :: Codegen Word
 fresh = do
@@ -182,7 +182,7 @@ fresh = do
   modify $ \s -> s { count = 1 + i }
   return $ i + 1
 
-instr :: Instruction -> Codegen (Operand)
+instr :: Instruction -> Codegen Operand
 instr ins = do
   n <- fresh
   let ref = (UnName n)
@@ -247,13 +247,13 @@ current = do
 assign :: Text -> Operand -> Codegen ()
 assign var x = do
   lcls <- gets symtab
-  modify $ \s -> s { symtab = MS.insert var x lcls }
+  modify $ \s -> s { symtab = MS.insert var (return x) lcls }
 
 getvar :: Text -> Codegen Operand
 getvar var = do
   syms <- gets symtab
   case MS.lookup var syms of
-    Just x  -> return x
+    Just x  -> x
     Nothing -> error $ "variable not in scope: " ++ show var
     -- Nothing -> case M.lookup var global of
                  -- Just x -> do

@@ -38,7 +38,7 @@ passes = defaultPassSetSpec
   { transforms = 
     [ 
     -- FunctionAttributes
-    AlwaysInline True
+    -- AlwaysInline True
     -- , FunctionInlining 10
     -- , PromoteMemoryToRegister
     -- , InstructionCombining
@@ -70,7 +70,7 @@ runJIT mod = do
               Just fn -> do
                 res <- run fn
                 putStrLn $ "Evaluated to: " ++ show res
-              Nothing -> return ()
+              Nothing -> putStrLn "error" >> return ()
 
           -- Return the optimized module
           return optmod

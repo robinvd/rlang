@@ -7,6 +7,7 @@ import qualified Data.Text.IO as T
 import qualified Data.Map as M
 import System.IO
 import Text.Pretty.Simple (pPrint)
+import qualified Data.Text.IO as T
 
 import Rlang.Parsing
 import Rlang.Scan
@@ -33,6 +34,9 @@ import Rlang.Jit
 
 isLeft (Left _) = True
 isLeft _ = False
+
+runFile :: String -> IO ()
+runFile file = T.readFile file >>= Rlang.Run.run
 
 run :: T.Text -> IO ()
 run input = do

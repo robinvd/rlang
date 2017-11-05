@@ -39,14 +39,18 @@ codegenTop env S.CFunc{..} =
   define (typeToLLVM retType) (T.unpack name) fnargs $ bls
   where
     fnargs = toSig args
-    bls = createBlocks $ execCodegen (fmap typeToLLVM env) $ do
-      entry <- addBlock entryBlockName
-      setBlock entry
-      forM args $ \a -> do
-        var <- alloca (typeToLLVM (snd a))
-        store var (local (AST.mkName (T.unpack (fst a))))
-        assign (fst a) var
-      cgen (M.fromList args) body >>= ret
+    globalToOperand :: Text -> S.Type -> Operand
+    globalToOperand name t = 
+        cons (C.GlobalReference (typeToLLVM t) (mkName (T.unpack name)))
+    bls = createBlocks $ execCodegen 
+      (M.mapWithKey globalToOperand env) $ do
+        entry <- addBlock entryBlockName
+        setBlock entry
+        forM args $ \a -> do
+          var <- alloca (typeToLLVM (snd a))
+          store var (local (AST.mkName (T.unpack (fst a))))
+          assign (fst a) var
+        cgen body >>= ret
 
 prelude :: LLVM ()
 prelude = do
@@ -81,29 +85,26 @@ toSig :: [(Text, S.Type)] -> [(AST.Type, AST.Name)]
 toSig = map (\(x,t) -> (typeToLLVM t, AST.mkName (T.unpack x)))
 
 cgen :: S.CBlock -> Codegen AST.Operand
-cgen envv S.CBlock {..} = last <$> mapM (gen (envv)) blockBody
+cgen S.CBlock {..} = last <$> mapM gen blockBody
   where
     isLocal :: Env -> Text -> Bool
     isLocal env name = case M.lookup name env of
                          Just _ -> True
                          _ -> False
     gen :: S.CExpr -> Codegen AST.Operand
-    gen local expr = case expr of
+    gen expr = case expr of
                  S.CCall fn args -> do
-                   largs <- mapM (cgen local) args
-                   case isLocal local fn of
-                     True -> do
-                       f <- getvar fn >>= load
-                       call f largs
+                   largs <- mapM cgen args
+                   f <- getvar fn -- >>= load
+                   call f largs
                        -- return f
-                     False -> call (externf (AST.mkName (T.unpack fn))) largs
                  (S.CAssign var st) -> do
                    ptr <- getvar var
                    res <- cgen st
                    store ptr res
                  (S.CLit pr) -> primCgen pr
                  S.CStruct name t fields -> do
-                   global <- gets globalTable
+                   global <- gets symtab
                    ptr <- alloca t
                    parts <- mapM (cgen ) fields
                    forM (zip [0..] parts) $ \(i, v) -> do
