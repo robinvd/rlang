@@ -37,16 +37,16 @@ passes :: PassSetSpec
 passes = defaultPassSetSpec
   { transforms = 
     [ 
-    -- FunctionAttributes
     AlwaysInline True
     -- , FunctionInlining 10
     , PromoteMemoryToRegister
     , InstructionCombining
-    -- , ConstantPropagation
+    , ConstantPropagation
     -- , DeadCodeElimination
     -- , AggressiveDeadCodeElimination
     -- , GlobalDeadCodeElimination
-    -- , TailCallElimination
+    , FunctionAttributes
+    , TailCallElimination
     ]
   }
 

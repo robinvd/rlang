@@ -35,8 +35,10 @@ import qualified Rlang.MapStack as MS
 
 
 codegenTop :: Env -> S.CFunc -> LLVM ()
-codegenTop env S.CFunc{..} =
+codegenTop env S.CFunc{..} = do
   define (typeToLLVM retType) (T.unpack name) fnargs $ bls
+  
+  mapM_ (addDefn . GlobalDefinition . snd) (M.toList $ toGlobal st)
   where
     fnargs = toSig args
     globalToOperand :: Text -> S.Type -> Codegen Operand
@@ -45,7 +47,8 @@ codegenTop env S.CFunc{..} =
       al <- alloca llvmT
       store al $ cons (C.GlobalReference llvmT (mkName (T.unpack name)))
       return al
-    bls = createBlocks $ execCodegen 
+    bls = createBlocks st
+    st = execCodegen 
       (M.mapWithKey globalToOperand env) $ do
         entry <- addBlock entryBlockName
         setBlock entry
@@ -53,8 +56,9 @@ codegenTop env S.CFunc{..} =
           var <- alloca (typeToLLVM (snd a))
           store var (local (AST.mkName (T.unpack (fst a))))
           assign (fst a) var
+        b <- cgen body
         if retType /= S.TUnit
-           then cgen body >>= ret
+           then ret b
            else terminator . Do $ Ret Nothing []
 
 prelude :: LLVM ()
@@ -79,12 +83,15 @@ prelude = do
   let c = typeToLLVM (S.TType "Char" [])
   let n = typeToLLVM (S.TType "Num" [])
   external VoidType "putchar" [(c, mkName "in" )]
-  external (T.ptr (StructureType False [int, int])) "malloc" [(n, Name "size" )]
+  external VoidType "puts" [(T.ptr c, mkName "in" )]
+  external (T.ptr (T.IntegerType 8)) "malloc" [(n, Name "size" )]
   -- define (typeToLLVM (S.TUnit)) "put2" [(c, mkName "in")] $
   --   createBlocks $ execCodegen M.empty $ do
   --     entry <- addBlock entryBlockName
   --     setBlock entry
   --     ret void
+
+malloc = call (cons $ C.GlobalReference (T.ptr (T.IntegerType 8)) (mkName "malloc")) [cons (C.Int 64 64)]
 
 toSig :: [(Text, S.Type)] -> [(AST.Type, AST.Name)]
 toSig = map (\(x,t) -> (typeToLLVM t, AST.mkName (T.unpack x)))
@@ -109,19 +116,20 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
                    store ptr res
                  (S.CLit pr) -> primCgen pr
                  S.CStruct name t fields -> do
-                   global <- gets symtab
-                   ptr <- alloca t
+                   -- small todo: figure out why there is a useless store instr
+                   mal <- malloc
+                   storage <- instr $ BitCast mal t []
                    parts <- mapM (cgen ) fields
                    forM (zip [0..] parts) $ \(i, v) -> do
-                     indexPtr <- instr $ GetElementPtr True ptr [cons (C.Int 64 i)] []
+                     indexPtr <- instr $ GetElementPtr True storage
+                       [cons (C.Int 32 0), cons (C.Int 32 i)] []
                      store indexPtr v
-                   return $ ptr
+                   return $ storage
                  (S.CVar name) -> getvar name >>= load
                  (S.CInit name t) -> do
                    var <- alloca (typeToLLVM t)
                    assign name var
                    return var
-                 -- TODO actually make a new scope
                  S.CScope bl -> do
                    modify $ \x -> x { symtab = MS.push (symtab x)}
                    ret <- cgen bl
@@ -168,6 +176,30 @@ primCgen :: S.Prim -> Codegen AST.Operand
 primCgen (S.Char ch) = return $ cons $ C.Int 8 (toInteger $ fromEnum ch)
 primCgen (S.Num i) = return $ cons $ C.Int 64 (toInteger i)
 primCgen (S.Unit) = return $ cons $ C.Int 2 (toInteger 0)
+primCgen (S.String str) = do
+
+  nameInt <- gets globalName
+  modify $ \x -> x { globalName = (globalName x + 1)}
+
+  let arr = C.Array (T.IntegerType 8) (map constChar (T.unpack str))
+  let arrT = T.ArrayType (fromInteger . toInteger . T.length $ str) (T.IntegerType 8)
+  let name = "str" ++ show nameInt
+      val = globalVariableDefaults 
+        { name = mkName name
+        , isConstant = True 
+        , LLVM.AST.Global.type' = arrT
+        , initializer = Just arr}
+
+  modify $ \x -> x { toGlobal = M.insert (T.pack name) val (toGlobal x)}
+
+  indexPtr <- instr $ GetElementPtr True (cons (C.GlobalReference arrT (mkName name)))
+    [cons (C.Int 32 0), cons (C.Int 32 0)] []
+  -- instr $ BitCast arr (T.ptr (T.IntegerType 8)) []
+  return indexPtr
+
+  where 
+    constChar :: Char -> C.Constant
+    constChar = C.Int 8 . toInteger . fromEnum
 -- primCGen env (S.Tulple xs) = do
   -- parts <- mapM (cgen env) xs
   -- return $ C.Struct Nothing True parts

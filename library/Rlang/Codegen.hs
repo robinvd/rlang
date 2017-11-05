@@ -125,6 +125,8 @@ data CodegenState
   -- , symtab       :: M.Map Text Operand
   -- , globalTable  :: M.Map Text Type
   , symtab       :: MS.MapStack Text (Codegen Operand)
+  , globalName   :: Int
+  , toGlobal     :: M.Map Text Global
   , blockCount   :: Int                      -- Count of basic blocksreturn $ 
   , count        :: Word                     -- Count of unnamed instructions
   , names        :: Names                    -- Name Supply
@@ -169,6 +171,8 @@ emptyCodegen = CodegenState
   (mkName (T.unpack entryBlockName))
   M.empty
   undefined
+  0
+  M.empty
   1
   0 
   M.empty

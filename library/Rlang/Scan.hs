@@ -38,7 +38,7 @@ type Check = ExceptT TypeError (Reader Env)
 checkPrim :: Env -> Prim -> Check Type
 checkPrim env p = case p of
 
-  String _ -> return $ TType "String" []
+  String _ -> return $ TType "Ptr" [TType "Char" []]
   Char _ -> return $ TType "Char" []
   Num _ -> return $ TType "Num" []
   -- Tulple xs -> do

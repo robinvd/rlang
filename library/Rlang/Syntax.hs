@@ -31,6 +31,10 @@ data Expression
   | Lit Prim
   | Struct Text [Expression]
 
+  -- get a field from a struct
+  -- name fieldToGet
+  | Get Text Text
+
   -- name retType assignment letBody
   | Let Text Type Expression [Expression]
   | Assign Text Expression

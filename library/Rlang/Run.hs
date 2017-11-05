@@ -31,6 +31,9 @@ import Rlang.Jit
 --
 --   feature list
 --   - structs/data + types
+--     - parsing: tulple, datatypes
+--     - backend
+--     - types
 --   - Arrays/Vectors
 --   - classes/polymophism
 --   - clib
@@ -55,7 +58,7 @@ compile file = do
       let scan = mconcat $ 
 
             [ (fst scantotal, x)
-            , (M.fromList [("+", TFunc n [n, n])], mempty)
+            , (M.fromList [("+", TFunc n [n, n]), ("-", TFunc n [n,n])], mempty)
             ] ++ modules
           typeCheck = fmap (checkTop (fst scan)) x
           errs = filter isLeft $ concat typeCheck

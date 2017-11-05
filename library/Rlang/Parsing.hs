@@ -136,10 +136,18 @@ assignment = do
   body <- exprSingle
   return $ Assign name body
 
+-- structGet :: Parser Expression
+-- structGet = do
+--   name <- identifier
+--   symbol "->"
+--   field <- identifier
+--   return Get name field
+
 factor :: Parser Expression
 factor = choice $ fmap try
     [ call
     , assignment
+    -- , structGet
     , int
     , str
     , char

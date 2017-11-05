@@ -52,7 +52,7 @@ typeToLLVM t = case t of
                  TFunc ret args -> T.ptr $
                    T.FunctionType (typeToLLVM ret) (map typeToLLVM args) False
                  TType "Ptr" [x] -> T.ptr (typeToLLVM x)
-                 TStruct _ xs -> T.StructureType True (map typeToLLVM xs)
+                 TStruct _ xs -> T.ptr (T.StructureType False (map typeToLLVM xs))
                  _ -> error "Unkown type"
 
 toCore :: Env -> [TopLevel] -> Core

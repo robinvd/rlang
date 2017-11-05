@@ -4,38 +4,14 @@
 import "test/prelude.rl"
 
 extern "stdio.h" putchar (Char) -> ();
+extern "stdio.h" puts (Ptr Char) -> ();
 extern "stdlib.h" malloc (Num) -> (Ptr Num);
 
-puts(a: Num) -> () = ()
-
-myFree(a: Ptr Num) -> () = ()
-
 main() -> Num =
-  # puts(0);
-  ();
-  5 + double(1) + f(n, 2);
-  5 + l()
-
-test() -> Num =
-  if 1 then
-    putchar('a');
-    2
-  else
-    # malloc(5);
-    putchar('b');
-    putchar('\n');
-    # f(n, 1)
-    3
-  end
-
-f(x : (Num) -> Num, a : Num) -> Num = 
-  x(2) + a
-
-c() -> Char = 'c'
-
-n(a:Num) -> Num = 
-  'c';
-  a+1
+  puts("hello, world\n\0");
+  let f: Num = fac(4)
+  putchar('\n');
+  f
 
 l() -> Num = 
   let x : Char = 'c'
@@ -43,7 +19,11 @@ l() -> Num =
   x = 3;
   x
 
-# pair() -> (Num, Num) = 
-#   malloc(32);
-#   (1,2)
+pair() -> (Num, Num) = 
+  let pair: (Num, Num) = (1,2) # malloc(32);
+  pair
+
+# fst(x: (Num,Num)) -> Num =
+#   # let (x,y): (Num,Num) = x
+#   x
 
