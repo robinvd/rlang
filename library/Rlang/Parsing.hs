@@ -129,14 +129,22 @@ while = do
 --   reserved "inline"
 --   Inline <$> quotedString
 
+assignment :: Parser Expression
+assignment = do
+  name <- identifier 
+  symbol "="
+  body <- exprSingle
+  return $ Assign name body
+
 factor :: Parser Expression
 factor = choice $ fmap try
     [ call
+    , assignment
     , int
     , str
     , char
     , variable
-    -- , parens expr
+    , parens factor
     , symbol "()" >> return (Lit Unit)
     , do
       x <- parens . commaSep $ factor
@@ -164,7 +172,7 @@ extern = do
 imp :: Parser TopLevel
 imp = do
   reserved "import"
-  package <- identifier
+  package <- quotedString
   return $ Import package
 
 parseIf :: Parser Expression

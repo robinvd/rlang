@@ -15,15 +15,16 @@ import Rlang.Syntax
 
 type Env = M.Map Text Type
 
-scanTop :: [TopLevel] -> Env
+scanTop :: [TopLevel] -> (Env, [Text])
 scanTop = mconcat . fmap scan
 
-scan :: TopLevel -> Env
+scan :: TopLevel -> (Env, [Text])
 scan x = case x of
-  Function ret name args _ -> M.singleton name (TFunc ret (map snd args))
+
+  Function ret name args _ -> (M.singleton name (TFunc ret (map snd args)), mempty)
   -- Binary ret name args expr -> scan $ Function ret name args expr
-  Extern _ ret name args -> M.singleton name (TFunc ret args)
-  Import package -> M.empty -- TODO
+  Extern _ ret name args -> (M.singleton name (TFunc ret args), mempty)
+  Import package -> (mempty, [package])
 
 data TypeError
   = Mismatch Type Type
@@ -74,7 +75,7 @@ checkT x = case x of
         | otherwise = throwError $ Mismatch x ret
   Extern pkgs ret name args -> return $ return ret
         
-  _ -> return $ throwError $ InteralError "Not a function"
+  _ -> []-- return $ throwError $ InteralError "Not a function"
 
 fits :: [Type] -> [Type] -> Maybe (Map Text Type)
 fits fargs input = f M.empty fargs input

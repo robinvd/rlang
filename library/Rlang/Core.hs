@@ -85,6 +85,8 @@ syntaxToCore env local body = CBlock (typeOf env local body) (map (single env lo
                   [ CInit varName varType
                   , CAssign varName (syntaxToCore env local [varVal])]
                   ++ map (single env newLocal) b
+            Assign varName val -> CAssign varName (syntaxToCore env local [val])
+              where t = findType env local varName
             If cond t f -> CIf 
                   (syntaxToCore env local cond)
                   (syntaxToCore env local t)

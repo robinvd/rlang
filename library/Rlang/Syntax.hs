@@ -33,6 +33,7 @@ data Expression
 
   -- name retType assignment letBody
   | Let Text Type Expression [Expression]
+  | Assign Text Expression
   | If [Expression] [Expression] [Expression]
   | While [Expression] [Expression]
   deriving (Show)

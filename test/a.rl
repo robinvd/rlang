@@ -1,6 +1,8 @@
 # binary 1 ; (a : x, b : y) : y =
 #   b
 
+import "test/prelude.rl"
+
 extern "stdio.h" putchar (Char) -> ();
 extern "stdlib.h" malloc (Num) -> (Ptr Num);
 
@@ -11,7 +13,8 @@ myFree(a: Ptr Num) -> () = ()
 main() -> Num =
   # puts(0);
   ();
-  5 + 1 + f(n, 2)
+  5 + double(1) + f(n, 2);
+  5 + l()
 
 test() -> Num =
   if 1 then
@@ -30,11 +33,14 @@ f(x : (Num) -> Num, a : Num) -> Num =
 
 c() -> Char = 'c'
 
-n(a:Num) -> Num = a+1
+n(a:Num) -> Num = 
+  'c';
+  a+1
 
-l() -> Char = 
-  let x : Num = 1
+l() -> Num = 
   let x : Char = 'c'
+  let x : Num = 1
+  x = 3;
   x
 
 # pair() -> (Num, Num) = 

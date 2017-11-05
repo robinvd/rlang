@@ -9,8 +9,8 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-    [] -> T.getContents >>= run
-    x:_ -> T.readFile x >>= run
+    [] -> run "/dev/stdin"
+    x:_ -> run x
     -- xs -> mapM_ (\x -> run =<< T.readFile x) xs
 
 

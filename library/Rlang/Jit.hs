@@ -38,10 +38,10 @@ passes = defaultPassSetSpec
   { transforms = 
     [ 
     -- FunctionAttributes
-    -- AlwaysInline True
+    AlwaysInline True
     -- , FunctionInlining 10
-    -- PromoteMemoryToRegister
-    -- , InstructionCombining
+    , PromoteMemoryToRegister
+    , InstructionCombining
     -- , ConstantPropagation
     -- , DeadCodeElimination
     -- , AggressiveDeadCodeElimination

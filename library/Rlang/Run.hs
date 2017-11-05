@@ -6,6 +6,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Map as M
 import System.IO
+import System.Exit
 import Text.Pretty.Simple (pPrint)
 import qualified Data.Text.IO as T
 
@@ -19,44 +20,57 @@ import Rlang.Jit
 
 -- | TODO
 --   overall todo list
+--   DONE
+--   - [done] a setVar function
+--
 --   FIXES
---   - letbinding/new variable keyword
---   - actually start a new scope in Emit/cgen
---   - function pointers
---   - void type in llvm instead of int 1
---   - externs
+--   - letbinding/new variable keyword -> let works
+--   - externs -> primitive version done
+--   - [almost see next one] void type in llvm instead of int 1
+--   - ability to return () and take () args
 --
 --   feature list
 --   - structs/data + types
+--   - Arrays/Vectors
 --   - classes/polymophism
 --   - clib
 --   - ability to include llvm/c/asm code
+--   - lambda's
 
 isLeft (Left _) = True
 isLeft _ = False
 
-runFile :: String -> IO ()
-runFile file = T.readFile file >>= Rlang.Run.run
-
-run :: T.Text -> IO ()
-run input = do
+compile :: String -> IO (Env, [TopLevel])
+compile file = do
+  input <- T.readFile file
   let syntaxTree = parseTopLevel input
   case syntaxTree of
-    Left err -> print err
+    Left err -> print err >> exitFailure
     Right x -> do
       pPrint x
       let n = TType "Num" []
-          scan :: Env
-          scan = scanTop x `M.union` M.fromList [("+", TFunc n [n, n])]
-          typeCheck = fmap (checkTop scan) x
-          -- errs = filter isLeft $ concat typeCheck
-      pPrint $ typeCheck
+          scantotal :: (Env, [T.Text])
+          scantotal = scanTop x
+      modules <- mapM (compile . T.unpack) (snd scantotal)
+      let scan = mconcat $ 
+
+            [ (fst scantotal, x)
+            , (M.fromList [("+", TFunc n [n, n])], mempty)
+            ] ++ modules
+          typeCheck = fmap (checkTop (fst scan)) x
+          errs = filter isLeft $ concat typeCheck
+      pPrint $ errs
       case any isLeft (concat typeCheck) of
-        True -> putStrLn "type Error"
+        True -> putStrLn "type Error" >> exitFailure
         False -> do
           putStrLn "program type checks"
-          let core = toCore scan x
-          pPrint core
-          a <- codegen scan (emptyModule "test") core
-          runJIT a
-          return ()
+          return scan
+
+run :: String -> IO ()
+run file = do
+  (scan, toplvl) <- compile file
+  let core = toCore scan toplvl
+  pPrint core
+  a <- codegen scan (emptyModule "test") (core)
+  runJIT a
+  return ()
