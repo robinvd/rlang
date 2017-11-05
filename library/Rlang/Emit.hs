@@ -22,7 +22,7 @@ import Data.Int
 import qualified Data.Map as M
 import Control.Monad.Except
 import Control.Monad.Reader (Reader, ask, runReader)
-import Control.Monad.State (gets)
+import Control.Monad.State (gets, modify)
 import Control.Applicative
 import qualified Data.Map as Map
 
@@ -39,9 +39,12 @@ codegenTop env S.CFunc{..} =
   define (typeToLLVM retType) (T.unpack name) fnargs $ bls
   where
     fnargs = toSig args
-    globalToOperand :: Text -> S.Type -> Operand
-    globalToOperand name t = 
-        cons (C.GlobalReference (typeToLLVM t) (mkName (T.unpack name)))
+    globalToOperand :: Text -> S.Type -> Codegen Operand
+    globalToOperand name t = do
+      let llvmT= typeToLLVM t
+      al <- alloca llvmT
+      store al $ cons (C.GlobalReference llvmT (mkName (T.unpack name)))
+      return al
     bls = createBlocks $ execCodegen 
       (M.mapWithKey globalToOperand env) $ do
         entry <- addBlock entryBlockName
@@ -50,7 +53,9 @@ codegenTop env S.CFunc{..} =
           var <- alloca (typeToLLVM (snd a))
           store var (local (AST.mkName (T.unpack (fst a))))
           assign (fst a) var
-        cgen body >>= ret
+        if retType /= S.TUnit
+           then cgen body >>= ret
+           else terminator . Do $ Ret Nothing []
 
 prelude :: LLVM ()
 prelude = do
@@ -95,7 +100,7 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
     gen expr = case expr of
                  S.CCall fn args -> do
                    largs <- mapM cgen args
-                   f <- getvar fn -- >>= load
+                   f <- getvar fn >>= load
                    call f largs
                        -- return f
                  (S.CAssign var st) -> do
@@ -117,7 +122,11 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
                    assign name var
                    return var
                  -- TODO actually make a new scope
-                 S.CScope bl -> cgen bl
+                 S.CScope bl -> do
+                   modify $ \x -> x { symtab = MS.push (symtab x)}
+                   ret <- cgen bl
+                   modify $ \x -> x { symtab = MS.pop (symtab x)}
+                   return ret
                  S.CIf cond tr fl -> do
                    ifthen <- addBlock "if.then"
                    ifelse <- addBlock "if.else"
@@ -158,7 +167,7 @@ primCgen :: S.Prim -> Codegen AST.Operand
 -- primCGen (String str) =
 primCgen (S.Char ch) = return $ cons $ C.Int 8 (toInteger $ fromEnum ch)
 primCgen (S.Num i) = return $ cons $ C.Int 64 (toInteger i)
-primCgen (S.Unit) = return $ cons $ C.Int 1 0
+primCgen (S.Unit) = return $ cons $ C.Int 2 (toInteger 0)
 -- primCGen env (S.Tulple xs) = do
   -- parts <- mapM (cgen env) xs
   -- return $ C.Struct Nothing True parts

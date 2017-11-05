@@ -125,7 +125,7 @@ data CodegenState
   -- , symtab       :: M.Map Text Operand
   -- , globalTable  :: M.Map Text Type
   , symtab       :: MS.MapStack Text (Codegen Operand)
-  , blockCount   :: Int                      -- Count of basic blocks
+  , blockCount   :: Int                      -- Count of basic blocksreturn $ 
   , count        :: Word                     -- Count of unnamed instructions
   , names        :: Names                    -- Name Supply
   } -- deriving Show
@@ -173,8 +173,8 @@ emptyCodegen = CodegenState
   0 
   M.empty
 
-execCodegen :: M.Map Text Operand -> Codegen a -> CodegenState
-execCodegen env m = execState (runCodegen m) emptyCodegen {symtab = return <$> MS.fromSingle env}
+execCodegen :: M.Map Text (Codegen Operand) -> Codegen a -> CodegenState
+execCodegen env m = execState (runCodegen m) emptyCodegen {symtab = MS.fromSingle env}
 
 fresh :: Codegen Word
 fresh = do

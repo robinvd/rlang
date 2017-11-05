@@ -40,7 +40,7 @@ passes = defaultPassSetSpec
     -- FunctionAttributes
     -- AlwaysInline True
     -- , FunctionInlining 10
-    -- , PromoteMemoryToRegister
+    -- PromoteMemoryToRegister
     -- , InstructionCombining
     -- , ConstantPropagation
     -- , DeadCodeElimination

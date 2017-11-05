@@ -47,12 +47,12 @@ typeToLLVM :: Type -> T.Type
 typeToLLVM t = case t of
                  TType "Char" [] -> T.IntegerType 8
                  TType "Num" [] -> T.IntegerType 64
-                 -- S.TUnit -> VoidType
-                 TUnit -> T.IntegerType 1
+                 TUnit -> T.VoidType
+                 -- TUnit -> T.IntegerType 1
                  TFunc ret args -> T.ptr $
                    T.FunctionType (typeToLLVM ret) (map typeToLLVM args) False
                  TType "Ptr" [x] -> T.ptr (typeToLLVM x)
-                 TStruct _ xs -> T.StructureType False (map typeToLLVM xs)
+                 TStruct _ xs -> T.StructureType True (map typeToLLVM xs)
                  _ -> error "Unkown type"
 
 toCore :: Env -> [TopLevel] -> Core
@@ -66,9 +66,9 @@ toCore env = mapMaybe f
   f _ = Nothing
 
 syntaxToCore :: Env -> Env -> [Expression] -> CBlock
-syntaxToCore env local body = CBlock (typeOf env local body) (map single body)
+syntaxToCore env local body = CBlock (typeOf env local body) (map (single env local) body)
   where
-    single x = case x of
+    single env local x = case x of
             -- TODO args of FCall be [Expr]
             FCall name b -> CCall name (map (syntaxToCore env local) (map (:[]) b))
             Var name -> CVar name
@@ -80,10 +80,11 @@ syntaxToCore env local body = CBlock (typeOf env local body) (map single body)
                 (map (syntaxToCore env local . (:[])) fields)
             Let varName varType varVal b -> CScope letBody
               where
-                letBody = CBlock (typeOf env local b) $ 
+                newLocal = M.insert varName varType local
+                letBody = CBlock (typeOf env newLocal b) $ 
                   [ CInit varName varType
                   , CAssign varName (syntaxToCore env local [varVal])]
-                  ++ map single b
+                  ++ map (single env newLocal) b
             If cond t f -> CIf 
                   (syntaxToCore env local cond)
                   (syntaxToCore env local t)
@@ -96,7 +97,9 @@ syntaxToCore env local body = CBlock (typeOf env local body) (map single body)
 findType :: Env -> Env -> Text -> Type
 findType env local name = case M.lookup name local of
                             Just x -> x
-                            Nothing -> fromJust $ M.lookup name env 
+                            Nothing -> case M.lookup name env of 
+                                         Just x -> x
+                                         Nothing -> error $ "tried to find: " ++ show name ++ " \n\n in: \nlocal: " ++ show local ++ "\nglobal:" ++ show env
 
 typeOf :: Env -> Env -> [Expression] -> Type
 typeOf env local body = case last body of
@@ -114,4 +117,3 @@ typeOf env local body = case last body of
                           If _ t _ -> typeOf env local t
                           While _ b -> typeOf env local b
 
-                          

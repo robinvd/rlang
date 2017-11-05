@@ -10,7 +10,8 @@ myFree(a: Ptr Num) -> () = ()
 
 main() -> Num =
   # puts(0);
-  5 + 1
+  ();
+  5 + 1 + f(n, 2)
 
 test() -> Num =
   if 1 then
@@ -24,15 +25,17 @@ test() -> Num =
     3
   end
 
-f(x : (Num) -> Num, a : Num) -> Num = x(2) + a
+f(x : (Num) -> Num, a : Num) -> Num = 
+  x(2) + a
 
 c() -> Char = 'c'
 
 n(a:Num) -> Num = a+1
 
-# l() -> Num = 
-#   let x : Num = 1
-#   x + 2
+l() -> Char = 
+  let x : Num = 1
+  let x : Char = 'c'
+  x
 
 # pair() -> (Num, Num) = 
 #   malloc(32);
