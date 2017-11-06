@@ -14,6 +14,7 @@ import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.IntegerPredicate as IP
+import qualified LLVM.AST.Visibility as V
 
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -33,11 +34,17 @@ import Rlang.Core (typeToLLVM)
 import qualified Rlang.Syntax as S
 import qualified Rlang.MapStack as MS
 
+import Text.Pretty.Simple (pPrint)
+
 
 codegenTop :: Env -> S.CFunc -> LLVM ()
 codegenTop env S.CFunc{..} = do
-  define (typeToLLVM retType) (T.unpack name) fnargs $ bls
-  
+  addDefn $ GlobalDefinition $ functionDefaults
+    { name = makeName name
+    , parameters = mkParameters fnargs
+    , returnType = typeToLLVM retType
+    , basicBlocks = bls
+    , visibility = if public then V.Default else V.Hidden}
   mapM_ (addDefn . GlobalDefinition . snd) (M.toList $ toGlobal st)
   where
     fnargs = toSig args
@@ -61,6 +68,11 @@ codegenTop env S.CFunc{..} = do
            then ret b
            else terminator . Do $ Ret Nothing []
 
+makeName :: T.Text -> Name
+makeName = AST.mkName . T.unpack
+
+mkParameters args = ([Parameter ty nm [] | (ty, nm) <- args], False)
+
 prelude :: LLVM ()
 prelude = do
   let args = [("a", S.TType "Num" []),("b",S.TType "Num" [])]
@@ -80,18 +92,34 @@ prelude = do
         (LocalReference int (Name "a"))
         (LocalReference int (Name "b")) [])
       ret res
+  defineInline VoidType "poke"
+    [ (T.ptr (T.IntegerType 8),mkName "ptr")
+    , (T.IntegerType 64, mkName "offset")
+    , (T.IntegerType 8, mkName "val")] $
+      createBlocks $ execCodegen M.empty $ do
+        let ptr = LocalReference (T.ptr T.i8) (Name "ptr")
+            offset = LocalReference T.i64 (Name "offset")
+            val = LocalReference T.i8 (Name "val")
+            cons0 = cons (C.Int 32 0)
+        entry <- addBlock entryBlockName
+        setBlock entry
+        valPtr <- instr $ GetElementPtr True ptr [offset] []
+        store valPtr val
+        terminator $ Do $ Ret Nothing []
+
   let c = typeToLLVM (S.TType "Char" [])
   let n = typeToLLVM (S.TType "Num" [])
   external VoidType "putchar" [(c, mkName "in" )]
   external VoidType "puts" [(T.ptr c, mkName "in" )]
   external (T.ptr (T.IntegerType 8)) "malloc" [(n, Name "size" )]
+  -- external (T.ptr (T.IntegerType 8)) "itoa" [(T.IntegerType 64, Name "size" )]
   -- define (typeToLLVM (S.TUnit)) "put2" [(c, mkName "in")] $
   --   createBlocks $ execCodegen M.empty $ do
   --     entry <- addBlock entryBlockName
   --     setBlock entry
   --     ret void
 
-malloc = call (cons $ C.GlobalReference (T.ptr (T.IntegerType 8)) (mkName "malloc")) [cons (C.Int 64 64)]
+malloc = call (cons $ C.GlobalReference (T.ptr ((T.IntegerType 8))) (mkName "malloc")) [cons (C.Int 64 64)]
 
 toSig :: [(Text, S.Type)] -> [(AST.Type, AST.Name)]
 toSig = map (\(x,t) -> (typeToLLVM t, AST.mkName (T.unpack x)))
@@ -125,6 +153,11 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
                        [cons (C.Int 32 0), cons (C.Int 32 i)] []
                      store indexPtr v
                    return $ storage
+                 S.CGet name i -> do
+                   v <- getvar name >>= load
+                   val <- instr $ GetElementPtr True v [cons (C.Int 32 0), cons (C.Int 32 i)] []
+                   load val
+
                  (S.CVar name) -> getvar name >>= load
                  (S.CInit name t) -> do
                    var <- alloca (typeToLLVM t)
@@ -186,7 +219,7 @@ primCgen (S.String str) = do
   let name = "str" ++ show nameInt
       val = globalVariableDefaults 
         { name = mkName name
-        , isConstant = True 
+        , isConstant = False 
         , LLVM.AST.Global.type' = arrT
         , initializer = Just arr}
 
@@ -208,11 +241,13 @@ liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return
 
 codegen :: Env -> AST.Module -> [S.CFunc] -> IO AST.Module
-codegen env mod fns = withContext $ \context ->
-  withModuleFromAST context newast $ \m -> do
-    llstr <- moduleLLVMAssembly m
-    -- putStrLn llstr
-    return newast
+codegen env mod fns = do -- withContext $ \context -> do
+  pPrint newast
+  return newast
+
+  -- withModuleFromAST context newast $ \m -> do
+    -- llstr <- moduleLLVMAssembly m
+    -- return m
   where
     modn = mapM (codegenTop env) fns >> prelude
     newast = runLLVM mod modn

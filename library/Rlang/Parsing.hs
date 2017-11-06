@@ -57,13 +57,13 @@ parseType = choice $ fmap try
     t <- parseType
     return $ TFunc t args
   , do
-    types <- parens . commaSep $ parseType
-    return $ TStruct "Tulple" types
-  , TVar <$> lowIdentifier
-  , do
     main <- capIdentifier
     rest <- many parseType
     return $ TType main rest
+  , do
+    types <- parens . commaSep $ parseType
+    return $ TStruct "Tulple" types
+  , TVar <$> lowIdentifier
   ]
 
 varType :: Parser (Text, Type)
@@ -75,16 +75,18 @@ varType = do
 
 function :: Parser TopLevel
 function = do
+  attr <- many $ try $ symbol "export"
   name <- identifier
   args <- parens . commaSep $ varType
   symbol "->"
   t <- parseType
   symbol "="
   body <- expr
-  return $ Function t name args body
+  return $ Function attr t name args body
 
 binDef :: Parser TopLevel
 binDef = do
+  attr <- many $ try $ symbol "export"
   reserved "binary"
   prio <- integer
   name <- operator
@@ -93,7 +95,7 @@ binDef = do
   t <- parseType
   symbol "="
   body <- expr
-  return $ Function t name args body
+  return $ Function attr t name args body
 
 -- semiExpr :: Parser Expression
 -- semiExpr = do
@@ -136,18 +138,24 @@ assignment = do
   body <- exprSingle
   return $ Assign name body
 
--- structGet :: Parser Expression
--- structGet = do
---   name <- identifier
---   symbol "->"
---   field <- identifier
---   return Get name field
+structGet :: Parser Expression
+structGet = do
+  name <- identifier
+  symbol "->"
+  choice 
+    [ do
+      field <- identifier
+      return $ Get name field
+    , do
+      num <- fromInteger <$> integer
+      return $ GetNum name num
+    ]
 
 factor :: Parser Expression
 factor = choice $ fmap try
     [ call
     , assignment
-    -- , structGet
+    , structGet
     , int
     , str
     , char

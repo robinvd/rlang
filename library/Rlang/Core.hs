@@ -18,6 +18,7 @@ type Core = [CFunc]
 
 data CFunc = CFunc
   { retType :: Type
+  , public :: Bool
   , origName :: Text
   , name :: Text
   , args :: [(Text, Type)]
@@ -36,6 +37,7 @@ data CExpr
   | CLit Prim
   -- name llvmType items
   | CStruct Text T.Type [CBlock]
+  | CGet Text Integer
   | CVar Text
   | CWhile CBlock CBlock
   | CIf CBlock CBlock CBlock
@@ -59,8 +61,9 @@ toCore :: Env -> [TopLevel] -> Core
 toCore env = mapMaybe f
   where
   f :: TopLevel -> Maybe CFunc
-  f (Function retType name args fBody) = Just CFunc {..}
+  f (Function attr retType name args fBody) = Just CFunc {..}
     where
+      public = "export" `elem` attr
       origName = name
       body = syntaxToCore env (M.fromList args) fBody
   f _ = Nothing
@@ -78,6 +81,7 @@ syntaxToCore env local body = CBlock (typeOf env local body) (map (single env lo
                 name 
                 (typeToLLVM $ typeOf env local [Struct name fields])
                 (map (syntaxToCore env local . (:[])) fields)
+            GetNum name i -> CGet name i
             Let varName varType varVal b -> CScope letBody
               where
                 newLocal = M.insert varName varType local
@@ -114,6 +118,9 @@ typeOf env local body = case last body of
                             case runCheck env (mapM (check local) fields) of
                               Left x -> error $ show x
                               Right x -> TStruct name x
+                          GetNum name i -> case findType env local name of
+                                             TStruct _ args -> args !! (fromInteger i)
+                                             _ -> error "not struct"
                           Let varName t _ b -> 
                             typeOf env (M.insert varName t local) b
                           If _ t _ -> typeOf env local t

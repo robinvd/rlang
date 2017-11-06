@@ -21,7 +21,7 @@ scanTop = mconcat . fmap scan
 scan :: TopLevel -> (Env, [Text])
 scan x = case x of
 
-  Function ret name args _ -> (M.singleton name (TFunc ret (map snd args)), mempty)
+  Function attr ret name args _ -> (M.singleton name (TFunc ret (map snd args)), mempty)
   -- Binary ret name args expr -> scan $ Function ret name args expr
   Extern _ ret name args -> (M.singleton name (TFunc ret args), mempty)
   Import package -> (mempty, [package])
@@ -66,7 +66,7 @@ lookupF local x = case M.lookup x local of
 checkT :: TopLevel -> [Check Type]
 checkT x = case x of
 
-  Function ret name args body -> map (check (M.fromList args)) body ++ [funcSigCheck]
+  Function attr ret name args body -> map (check (M.fromList args)) body ++ [funcSigCheck]
     where
       funcSigCheck = f =<< check (M.fromList args) (last body)
       f :: Type -> Check Type
@@ -122,6 +122,13 @@ check local expr =
 
     Struct name xs -> 
       return .TStruct name =<< mapM (check local) xs
+
+    -- Get
+    GetNum name field -> do
+      l <- lookupF local name 
+      case l of
+        TStruct name xs -> return $ xs !! (fromInteger field)
+        _ -> throwError $ undefined
 
     Let varName t val rest -> check (M.insert varName t local) (last rest)
     -- Assignment _ _ -> return TUnit

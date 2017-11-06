@@ -66,7 +66,6 @@ defineInline retty label argtys body = addDefn $
   -- , visibility = V.Hidden
   }
 
-
 define :: Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $
   GlobalDefinition $ functionDefaults {

@@ -3,15 +3,17 @@
 
 import "test/prelude.rl"
 
-extern "stdio.h" putchar (Char) -> ();
-extern "stdio.h" puts (Ptr Char) -> ();
-extern "stdlib.h" malloc (Num) -> (Ptr Num);
-
+export
 main() -> Num =
-  puts("hello, world\n\0");
-  let f: Num = fac(4)
-  putchar('\n');
-  f
+  let str: Ptr Char = "hello\0"
+  poke(str, 0, 'b');
+  println(str);
+  # println("hello, world");
+  # let x: (Ptr Char) = malloc(32)
+  # poke("test", 0, 'h');
+  # println(x);
+  let p: (Num,Num) = pair()
+  p -> 1
 
 l() -> Num = 
   let x : Char = 'c'
@@ -19,8 +21,8 @@ l() -> Num =
   x = 3;
   x
 
-pair() -> (Num, Num) = 
-  let pair: (Num, Num) = (1,2) # malloc(32);
+pair() -> (Num,Num) = 
+  let pair: (Num, Num) = (1,2)
   pair
 
 # fst(x: (Num,Num)) -> Num =

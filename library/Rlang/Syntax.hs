@@ -34,6 +34,7 @@ data Expression
   -- get a field from a struct
   -- name fieldToGet
   | Get Text Text
+  | GetNum Text Integer
 
   -- name retType assignment letBody
   | Let Text Type Expression [Expression]
@@ -45,8 +46,8 @@ data Expression
 data TopLevel
 
   -- define a new function
-  -- retType Name arguments body
-  = Function Type Text [(Text, Type)] [Expression]
+  -- attr retType Name arguments body
+  = Function [Text] Type Text [(Text, Type)] [Expression]
 
   -- define a new binary function
   -- retType name arguments body

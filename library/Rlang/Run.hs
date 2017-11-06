@@ -75,5 +75,6 @@ run file = do
   let core = toCore scan toplvl
   pPrint core
   a <- codegen scan (emptyModule "test") (core)
+  print a
   runJIT a
   return ()

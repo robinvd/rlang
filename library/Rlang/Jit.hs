@@ -39,14 +39,14 @@ passes = defaultPassSetSpec
     [ 
     AlwaysInline True
     -- , FunctionInlining 10
-    , PromoteMemoryToRegister
-    , InstructionCombining
-    , ConstantPropagation
+    -- , PromoteMemoryToRegister
+    -- , InstructionCombining
+    -- , ConstantPropagation
     -- , DeadCodeElimination
     -- , AggressiveDeadCodeElimination
     -- , GlobalDeadCodeElimination
-    , FunctionAttributes
-    , TailCallElimination
+    -- , FunctionAttributes
+    -- , TailCallElimination
     ]
   }
 
