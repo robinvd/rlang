@@ -25,6 +25,7 @@ scan x = case x of
   -- Binary ret name args expr -> scan $ Function ret name args expr
   Extern _ ret name args -> (M.singleton name (TFunc ret args), mempty)
   Import package -> (mempty, [package])
+  _ -> mempty
 
 data TypeError
   = Mismatch Type Type

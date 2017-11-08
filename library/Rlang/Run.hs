@@ -46,7 +46,7 @@ isLeft _ = False
 compile :: String -> IO (Env, [TopLevel])
 compile file = do
   input <- T.readFile file
-  let syntaxTree = parseTopLevel input
+  let syntaxTree = parseTopLevel file input
   case syntaxTree of
     Left err -> print err >> exitFailure
     Right x -> do

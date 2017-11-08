@@ -3,10 +3,12 @@
 
 import "test/prelude.rl"
 
+data StrLen = StrLen ((Ptr Char) Num)
+
 export
 main() -> Num =
   let str: Ptr Char = "hello\0"
-  poke(str, 0, 'b');
+  # poke(str, 0, 'b');
   println(str);
   # println("hello, world");
   # let x: (Ptr Char) = malloc(32)

@@ -4,7 +4,8 @@
 
 module Rlang.Parsing where
 
-import           Text.Parsec ((<|>), many, Parsec, choice, parse, eof, try, ParseError)
+import           Control.Monad
+import           Text.Parsec ((<|>), unexpected, many, Parsec, choice, parse, eof, try, ParseError)
 import           Text.Parsec.Text ()
 import           Text.Parsec.Combinator
 import qualified Text.Parsec.Expr as Ex
@@ -60,8 +61,10 @@ parseType = choice $ fmap try
     main <- capIdentifier
     rest <- many parseType
     return $ TType main rest
+  , parens parseType
   , do
     types <- parens . commaSep $ parseType
+    when (length types < 2) (unexpected "need atleast 2 for tulple")
     return $ TStruct "Tulple" types
   , TVar <$> lowIdentifier
   ]
@@ -96,12 +99,6 @@ binDef = do
   symbol "="
   body <- expr
   return $ Function attr t name args body
-
--- semiExpr :: Parser Expression
--- semiExpr = do
---   x <- expr
---   reservedOp ";"
---   return x
 
 call :: Parser Expression
 call = do
@@ -191,6 +188,16 @@ imp = do
   package <- quotedString
   return $ Import package
 
+struct :: Parser TopLevel
+struct = do
+  reserved "data"
+  name <- capIdentifier
+  para <- many $ try lowIdentifier
+  symbol "="
+  constr <- capIdentifier
+  types <- parens $ many $ try parseType
+  return $ StructDeclare name para constr types
+
 parseIf :: Parser Expression
 parseIf = do
   reserved "if"
@@ -203,7 +210,12 @@ parseIf = do
   return $ If cond body elsebody
 
 toplevel :: Parsec Text () [TopLevel]
-toplevel = many $ function <|> binDef <|> extern <|> imp -- <|> inline
+toplevel = many $ choice $ fmap try
+  [ struct
+  , function 
+  , binDef 
+  , extern
+  , imp] -- <|> inline
 
-parseTopLevel :: Text -> Either ParseError [TopLevel]
-parseTopLevel = parse (contents toplevel) "<stdin>"
+parseTopLevel :: String -> Text -> Either ParseError [TopLevel]
+parseTopLevel = parse (contents toplevel)

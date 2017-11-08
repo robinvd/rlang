@@ -49,6 +49,12 @@ data TopLevel
   -- attr retType Name arguments body
   = Function [Text] Type Text [(Text, Type)] [Expression]
 
+  -- data declaration
+  -- typeName typeVar ConstName TypesInStruct
+  -- data Pair a b = MakePair a b
+  -- becomes "Pair" ["a","b"] "MakePair" [TypeVar a, TypeVar b]
+  | StructDeclare Text [Text] Text [Type]
+
   -- define a new binary function
   -- retType name arguments body
   -- | Binary Type Text [(Text, Type)] Expression
