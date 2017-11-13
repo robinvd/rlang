@@ -4,7 +4,7 @@ let
 
   inherit (nixpkgs) pkgs;
 
-  llvm-hs-over = pkgs.haskellPackages.llvm-hs.override { llvm-config = pkgs.llvm_4.override {debugVersion = true;}; };
+  # llvm-hs-over = pkgs.haskellPackages.llvm-hs.override { llvm-config = pkgs.llvm_4.override {debugVersion = true;}; };
   f = { mkDerivation, base, bytestring, containers, llvm-hs
       , llvm-hs-pure, mtl, parsec, pretty-simple, stdenv, text
       }:
@@ -15,7 +15,7 @@ let
         isLibrary = true;
         isExecutable = true;
         libraryHaskellDepends = [
-          base bytestring containers llvm-hs-over llvm-hs-pure mtl parsec
+          base bytestring containers llvm-hs llvm-hs-pure mtl parsec
           pretty-simple text
         ];
         executableHaskellDepends = [ base text ];

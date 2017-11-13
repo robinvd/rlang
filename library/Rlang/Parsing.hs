@@ -65,7 +65,7 @@ parseType = choice $ fmap try
   , do
     types <- parens . commaSep $ parseType
     when (length types < 2) (unexpected "need atleast 2 for tulple")
-    return $ TStruct "Tulple" types
+    return $ TType "Tulple" types
   , TVar <$> lowIdentifier
   ]
 
@@ -148,9 +148,18 @@ structGet = do
       return $ GetNum name num
     ]
 
+structInit :: Parser Expression
+structInit = do
+  strName <- capIdentifier
+  args <- parens . commaSep $ exprSingle
+  return $ Struct strName args
+
+
+
 factor :: Parser Expression
 factor = choice $ fmap try
-    [ call
+    [ structInit
+    , call
     , assignment
     , structGet
     , int
@@ -195,7 +204,7 @@ struct = do
   para <- many $ try lowIdentifier
   symbol "="
   constr <- capIdentifier
-  types <- parens $ many $ try parseType
+  types <- parens $ commaSep $ parseType
   return $ StructDeclare name para constr types
 
 parseIf :: Parser Expression

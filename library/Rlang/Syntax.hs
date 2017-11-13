@@ -15,7 +15,7 @@ data Type
   | TUnit
   -- variable in a type ex. forall a. a -> a
   | TVar Text
-  | TStruct Text [Type]
+  -- | TStruct Text [Type]
   | TArr [Type]
   | TFunc Type [Type]
   deriving (Show, Eq)

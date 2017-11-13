@@ -22,23 +22,26 @@ import Rlang.Jit
 --   overall todo list
 --   DONE
 --   - [done] a setVar function
+--   - [done] structs/data + types
 --
 --   FIXES
 --   - letbinding/new variable keyword -> let works
 --   - externs -> primitive version done
 --   - [almost see next one] void type in llvm instead of int 1
 --   - ability to return () and take () args
+--   - type checking on constructors: StrLen("a", 1) works even if StrLn has 3 fields
 --
 --   feature list
---   - structs/data + types
---     - parsing: tulple, datatypes
---     - backend
---     - types
+--   - polymorphic data types
 --   - Arrays/Vectors
 --   - classes/polymophism
 --   - clib
 --   - ability to include llvm/c/asm code
 --   - lambda's
+--
+--   notes:
+--   - make polymorphic data structures have void* elements 
+--     and cast them to the actual type when needed
 
 isLeft (Left _) = True
 isLeft _ = False
@@ -58,11 +61,15 @@ compile file = do
       let scan = mconcat $ 
 
             [ (fst scantotal, x)
-            , (M.fromList [("+", TFunc n [n, n]), ("-", TFunc n [n,n])], mempty)
+            , (Env (M.fromList 
+              [("+", TFunc n [n, n])
+              , ("-", TFunc n [n,n])
+              , ("exitWithCode", TFunc TUnit [n])]
+            ) mempty, mempty)
             ] ++ modules
           typeCheck = fmap (checkTop (fst scan)) x
           errs = filter isLeft $ concat typeCheck
-      pPrint $ errs
+      pPrint errs
       case any isLeft (concat typeCheck) of
         True -> putStrLn "type Error" >> exitFailure
         False -> do
@@ -75,6 +82,5 @@ run file = do
   let core = toCore scan toplvl
   pPrint core
   a <- codegen scan (emptyModule "test") (core)
-  print a
   runJIT a
   return ()

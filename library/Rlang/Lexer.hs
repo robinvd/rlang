@@ -24,7 +24,7 @@ myDef = Tok.LanguageDef
                , Tok.opStart        = Tok.opLetter myDef
                , Tok.opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
                , Tok.reservedOpNames= []
-               , Tok.reservedNames  = []
+               , Tok.reservedNames  = ["let"]
                , Tok.caseSensitive  = True
                }
 

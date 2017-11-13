@@ -18,6 +18,8 @@ import Control.Monad.State
 import Control.Monad.Reader (ReaderT, runReaderT, ask)
 import Control.Monad.Identity
 
+import GHC.Stack
+
 import LLVM.AST
 import LLVM.AST.Global
 import qualified LLVM.AST as AST
@@ -98,6 +100,41 @@ int = IntegerType 64
 
 bool :: Type
 bool = IntegerType 1
+
+getTypefromOperand :: Operand -> Type
+getTypefromOperand (LocalReference t _) = t
+getTypefromOperand (ConstantOperand c) =
+  case c of
+    C.Int b _ -> IntegerType b
+    C.Float _ -> FloatingPointType DoubleFP
+    C.GlobalReference t _ -> t
+    _ -> error "field not done yet"
+getTypefromOperand (MetadataOperand _) = error "MetadataOperand not supported"
+
+typeFromInstr :: HasCallStack =>  Instruction -> Type
+typeFromInstr x =
+  case x of
+    Add _ _ op0 _ _ -> getTypefromOperand op0
+    Sub _ _ op0 _ _ -> getTypefromOperand op0
+    FAdd _ op0 _ _ -> getTypefromOperand op0
+    FSub _ op0 _ _ -> getTypefromOperand op0
+    Mul _ _ op0 _ _ -> getTypefromOperand op0
+    FMul _ op0 _ _ -> getTypefromOperand op0
+    Load _ addr _ _ _ -> unPtrType $ getTypefromOperand addr 
+    Store _ _ _ _ _ _ -> VoidType
+    ICmp _ op0 _ _ -> getTypefromOperand op0
+    Phi t _ _ -> t
+    Call _ _ _ f _ _ _ -> case f of
+      Left _ -> error "typeFromInstr does not support inline asm"
+      Right op -> getTypefromOperand op
+    BitCast _ t _ -> t
+    x -> error $ show x
+
+    
+
+unPtrType :: HasCallStack => Type -> Type
+unPtrType (PointerType x _) = x
+unPtrType x = error $ "not a ptr type: " ++ show x
 
 -------------------------------------------------------------------------------
 -- Names
@@ -185,14 +222,18 @@ fresh = do
   modify $ \s -> s { count = 1 + i }
   return $ i + 1
 
-instr :: Instruction -> Codegen Operand
-instr ins = do
+instr :: HasCallStack => Instruction -> Codegen Operand
+instr ins = instrT (typeFromInstr ins) ins
+
+instrT :: Type -> Instruction -> Codegen Operand
+instrT t ins = do
   n <- fresh
   let ref = (UnName n)
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = (ref := ins) : i } )
-  return $ local ref
+  return $ LocalReference t ref
+
 
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
@@ -268,42 +309,39 @@ getvar var = do
 -------------------------------------------------------------------------------
 
 -- References
-local ::  Name -> Operand
-local = LocalReference int
+localInt ::  Name -> Operand
+localInt = LocalReference int
 
-localf :: Name -> Operand
-localf = LocalReference double
+-- global ::  Name -> C.Constant
+-- global = C.GlobalReference double
 
-global ::  Name -> C.Constant
-global = C.GlobalReference double
-
-externf :: Name -> Operand
-externf = ConstantOperand . C.GlobalReference double
+-- externf :: Name -> Operand
+-- externf = ConstantOperand . C.GlobalReference double
 
 -- Arithmetic and Constants
 fadd :: Operand -> Operand -> Codegen Operand
-fadd a b = instr $ FAdd NoFastMathFlags a b []
+fadd a b = instrT double $ FAdd NoFastMathFlags a b []
 
 fsub :: Operand -> Operand -> Codegen Operand
-fsub a b = instr $ FSub NoFastMathFlags a b []
+fsub a b = instrT double $ FSub NoFastMathFlags a b []
 
 fmul :: Operand -> Operand -> Codegen Operand
-fmul a b = instr $ FMul NoFastMathFlags a b []
+fmul a b = instrT double $ FMul NoFastMathFlags a b []
 
 fdiv :: Operand -> Operand -> Codegen Operand
-fdiv a b = instr $ FDiv NoFastMathFlags a b []
+fdiv a b = instrT double $ FDiv NoFastMathFlags a b []
 
 fcmp :: FP.FloatingPointPredicate -> Operand -> Operand -> Codegen Operand
-fcmp cond a b = instr $ FCmp cond a b []
+fcmp cond a b = instrT double  $ FCmp cond a b []
 
 icmp :: IP.IntegerPredicate -> Operand -> Operand -> Codegen Operand
-icmp cond a b = instr $ ICmp cond a b []
+icmp cond a b = instrT double $ ICmp cond a b []
 
 cons :: C.Constant -> Operand
 cons = ConstantOperand
 
 uitofp :: Type -> Operand -> Codegen Operand
-uitofp ty a = instr $ UIToFP a ty []
+uitofp ty a = instrT double $ UIToFP a ty []
 
 toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
@@ -313,12 +351,12 @@ call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
 alloca :: Type -> Codegen Operand
-alloca ty = instr $ Alloca ty Nothing 0 []
+alloca ty = instrT ty $ Alloca ty Nothing 0 []
 
 store :: Operand -> Operand -> Codegen Operand
 store ptr val = instr $ Store False ptr val Nothing 0 []
 
-load :: Operand -> Codegen Operand
+load :: HasCallStack => Operand -> Codegen Operand
 load ptr = instr $ Load False ptr Nothing 0 []
 
 -- Control Flow

@@ -1,31 +1,57 @@
 # binary 1 ; (a : x, b : y) : y =
 #   b
 
-import "test/prelude.rl"
+extern "" puts(Ptr Char) -> ();
+extern "" exitWithCode(Num) -> ();
+extern "" getline() -> (Ptr Char);
+extern "" getchar() -> (Char);
+extern "" putchar(Char) -> ();
+extern "" malloc(Int) -> (Ptr Char);
+extern "" toInt(Num) -> (Int);
+extern "" cmpChar(Char, Char) -> (Bool);
+extern "" poke(Ptr Char, Num, Char) -> ();
 
-data StrLen = StrLen ((Ptr Char) Num)
+# import "test/prelude.rl"
+
+data StrLen = StrLen (Ptr Char, Num, Num)
+data Double a = Double (a,a)
 
 export
-main() -> Num =
-  let str: Ptr Char = "hello\0"
-  # poke(str, 0, 'b');
-  println(str);
-  # println("hello, world");
-  # let x: (Ptr Char) = malloc(32)
-  # poke("test", 0, 'h');
-  # println(x);
-  let p: (Num,Num) = pair()
-  p -> 1
+main() -> () =
+  # let input: Char = getchar()
+  # putchar(input);
+  # let line: Ptr Char = getline()
+  let test: Bool = cmpChar('1','2')
+  if test then
+    exitWithCode(3 + 5)
+  else
+    exitWithCode(8 - 5)
+  end
 
-l() -> Num = 
-  let x : Char = 'c'
-  let x : Num = 1
-  x = 3;
-  x
+# getline() -> Ptr Char = 
+#   let buffer: Ptr Char = malloc(toInt(10))
+#   f(buffer, 0);
+#   buffer
+# 
+# f(buffer: Ptr Char, current: Num) -> () =
+#   let in: Char = getchar()
+#   if cmpChar(in, '\n') then
+#     ()
+#   else
+#     poke(buffer, current, in);
+#     f(buffer, current + 1)
+#   end
 
-pair() -> (Num,Num) = 
-  let pair: (Num, Num) = (1,2)
-  pair
+# test() -> Num = 0
+# l() -> Num = 
+#   let x : Char = 'c'
+#   let x : Num = 1
+#   x = 3;
+#   x
+# 
+# pair() -> (Num,Num) = 
+#   let pair: (Num, Num) = (1,2)
+#   pair
 
 # fst(x: (Num,Num)) -> Num =
 #   # let (x,y): (Num,Num) = x
