@@ -57,7 +57,7 @@ runJIT mod = do
       withModuleFromAST context mod $ \m -> do
         withPassManager passes $ \pm -> do
           -- Optimization Pass
-          runPassManager pm m
+          -- runPassManager pm m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
           B.putStrLn s

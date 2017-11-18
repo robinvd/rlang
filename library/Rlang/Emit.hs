@@ -82,7 +82,7 @@ prelude = do
       setBlock entry
       a <- load $ LocalReference (T.ptr T.i64) $ mkName "a"
       b <- load $ LocalReference (T.ptr T.i64) $ mkName "b"
-      res <- (instr $ Add False False a b [])
+      res <- instr $ Add False False a b []
       storage <- malloc 8
       castedPtr <- instr $ BitCast storage (T.ptr T.i64) []
       store castedPtr res
@@ -93,7 +93,7 @@ prelude = do
       setBlock entry
       a <- load $ LocalReference (T.ptr T.i64) $ mkName "a"
       b <- load $ LocalReference (T.ptr T.i64) $ mkName "b"
-      res <- (instr $ Sub False False a b [])
+      res <- instr $ Sub False False a b []
       storage <- malloc 8
       castedPtr <- instr $ BitCast storage (T.ptr T.i64) []
       store castedPtr res
@@ -174,8 +174,8 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
         mal <- malloc 64
         storage <- instrT t $ BitCast mal t []
         parts <- mapM cgen fields
-        forM (zip [0..] parts) $ \(i, v) -> do
-          indexPtr <- instr $ GetElementPtr True storage
+        forM_ (zip [0..] parts) $ \(i, v) -> do
+          indexPtr <- instrT (unPtrType t) $ GetElementPtr True storage
             [cons (C.Int 32 0), cons (C.Int 32 i)] []
           castedPtr <- instr $ BitCast indexPtr (T.ptr (T.ptr T.i64)) []
           store castedPtr v
@@ -183,12 +183,17 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
         return $ storage
       S.CGet name i -> do
         v <- getvar name >>= load
-        val <- instr $ GetElementPtr True v [cons (C.Int 32 0), cons (C.Int 32 i)] []
-        load val
+        -- error $ show v
+        let fields = T.elementTypes . T.pointerReferent $ getTypefromOperand v
+            getFieldType = T.ptr $ fields !! fromInteger i
+
+        valPtr <- instrT getFieldType $ GetElementPtr True v [cons (C.Int 32 0), cons (C.Int 32 i)] []
+        load valPtr
 
       (S.CVar name) -> getvar name >>= load
       (S.CInit name t) -> do
         var <- alloca t
+        -- error $ show var
         assign name var
         return var
       S.CScope bl -> do
@@ -225,7 +230,7 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
         ------------------
         setBlock ifexit
         -- TODO no hardcode type
-        phi T.i8 [(trval, ifthen), (flval, ifelse)]
+        phi (getTypefromOperand trval) [(trval, ifthen), (flval, ifelse)]
 
       S.CWhile _ _ -> error "no while yet"
       -- (S.Ret x) -> do
@@ -258,7 +263,7 @@ primCgen (S.String str) = do
 
   modify $ \x -> x { toGlobal = M.insert (T.pack name) val (toGlobal x)}
 
-  indexPtr <- instr $ GetElementPtr True (cons (C.GlobalReference arrT (mkName name)))
+  indexPtr <- instrT (T.ptr T.i8) $ GetElementPtr True (cons (C.GlobalReference arrT (mkName name)))
     [cons (C.Int 32 0), cons (C.Int 32 0)] []
   -- instr $ BitCast arr (T.ptr (T.IntegerType 8)) []
   return indexPtr

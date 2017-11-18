@@ -25,6 +25,7 @@ import LLVM.AST.Global
 import qualified LLVM.AST as AST
 
 import qualified LLVM.AST.Linkage as L
+import qualified LLVM.AST.Type as T
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Attribute as A
 import qualified LLVM.AST.Visibility as V
@@ -351,7 +352,7 @@ call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
 alloca :: Type -> Codegen Operand
-alloca ty = instrT ty $ Alloca ty Nothing 0 []
+alloca ty = instrT (T.ptr ty) $ Alloca ty Nothing 0 []
 
 store :: Operand -> Operand -> Codegen Operand
 store ptr val = instr $ Store False ptr val Nothing 0 []

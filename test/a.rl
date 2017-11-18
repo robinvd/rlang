@@ -3,30 +3,34 @@
 
 extern "" puts(Ptr Char) -> ();
 extern "" exitWithCode(Num) -> ();
-extern "" getline() -> (Ptr Char);
+# extern "" getline() -> (Ptr Char);
 extern "" getchar() -> (Char);
 extern "" putchar(Char) -> ();
-extern "" malloc(Int) -> (Ptr Char);
-extern "" toInt(Num) -> (Int);
+# extern "" malloc(Int) -> (Ptr Char);
+# extern "" toInt(Num) -> (Int);
 extern "" cmpChar(Char, Char) -> (Bool);
-extern "" poke(Ptr Char, Num, Char) -> ();
+# extern "" poke(Ptr Char, Num, Char) -> ();
 
 # import "test/prelude.rl"
 
 data StrLen = StrLen (Ptr Char, Num, Num)
 data Double a = Double (a,a)
+data DInt = DInt (Num, Num)
 
 export
 main() -> () =
-  # let input: Char = getchar()
-  # putchar(input);
+  # let str: StrLen = StrLen("abc", 4, 4)
+  puts("abc\n");
+  let a: DInt = DInt(97,98)
+  putchar('c');
   # let line: Ptr Char = getline()
-  let test: Bool = cmpChar('1','2')
-  if test then
-    exitWithCode(3 + 5)
-  else
-    exitWithCode(8 - 5)
-  end
+  # let test: Bool = cmpChar('1','2')
+  # if test then
+    # 1
+  # else
+    # 2
+  # end;
+  exitWithCode(a -> 0)
 
 # getline() -> Ptr Char = 
 #   let buffer: Ptr Char = malloc(toInt(10))
