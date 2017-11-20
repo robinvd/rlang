@@ -18,6 +18,7 @@ import qualified LLVM.AST.Visibility as V
 
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy.IO as LT
 import Data.Word
 import Data.Int
 import qualified Data.Map as M
@@ -35,6 +36,7 @@ import qualified Rlang.Syntax as S
 import qualified Rlang.MapStack as MS
 
 import Text.Pretty.Simple (pPrint)
+import LLVM.Pretty (ppllvm)
 
 
 codegenTop :: Env -> S.CFunc -> LLVM ()
@@ -76,79 +78,72 @@ mkParameters args = ([Parameter ty nm [] | (ty, nm) <- args], False)
 prelude :: LLVM ()
 prelude = do
   let args = map (fmap (typeToLLVM mempty)) [("a", S.TType "Num" []),("b",S.TType "Num" [])]
-  defineInline (T.ptr T.i64) "+" (toSig args) $
-    createBlocks $ execCodegen M.empty $ do
-      entry <- addBlock entryBlockName
-      setBlock entry
-      a <- load $ LocalReference (T.ptr T.i64) $ mkName "a"
-      b <- load $ LocalReference (T.ptr T.i64) $ mkName "b"
-      res <- instr $ Add False False a b []
-      storage <- malloc 8
-      castedPtr <- instr $ BitCast storage (T.ptr T.i64) []
-      store castedPtr res
-      ret castedPtr
-  defineInline (T.ptr T.i64) "-" (toSig args) $
-    createBlocks $ execCodegen M.empty $ do
-      entry <- addBlock entryBlockName
-      setBlock entry
-      a <- load $ LocalReference (T.ptr T.i64) $ mkName "a"
-      b <- load $ LocalReference (T.ptr T.i64) $ mkName "b"
-      res <- instr $ Sub False False a b []
-      storage <- malloc 8
-      castedPtr <- instr $ BitCast storage (T.ptr T.i64) []
-      store castedPtr res
-      ret castedPtr
-  defineInline VoidType "exitWithCode"
-    [ (T.ptr T.i64, mkName "codePtr")] $
-      createBlocks $ execCodegen M.empty $ do
-        entry <- addBlock entryBlockName
-        setBlock entry
-        code <- load (LocalReference (T.ptr T.i64) $ mkName "codePtr")
-        call (cons $ C.GlobalReference (T.FunctionType VoidType [T.i64] False) $ mkName "exit") [code]
-        terminator $ Do $ Ret Nothing []
-  defineInline T.i64 "toInt"
-    [ (T.ptr T.i64, mkName "input")] $
-      createBlocks $ execCodegen M.empty $ do
-        entry <- addBlock entryBlockName
-        setBlock entry
-        code <- load (LocalReference (T.ptr T.i64) $ mkName "input")
-        ret code
-  defineInline T.i1 "cmpChar"
-    [ (T.i8, mkName "a"), (T.i8, mkName "b")] $
-      createBlocks $ execCodegen M.empty $ do
-        entry <- addBlock entryBlockName
-        setBlock entry
-        r <- instrT T.i1 $ ICmp IP.EQ (LocalReference T.i8 $ mkName "a") (LocalReference T.i8 $ mkName "b") []
-        terminator $ Do $ Ret (Just r) []
+  -- defineInline (T.ptr T.i64) "+" (toSig args) $
+  --   createBlocks $ execCodegen M.empty $ do
+  --     entry <- addBlock entryBlockName
+  --     setBlock entry
+  --     a <- load $ LocalReference (T.ptr T.i64) $ mkName "a"
+  --     b <- load $ LocalReference (T.ptr T.i64) $ mkName "b"
+  --     res <- instr $ Add False False a b []
+  --     storage <- malloc 8
+  --     castedPtr <- instr $ BitCast storage (T.ptr T.i64) []
+  --     store castedPtr res
+  --     ret castedPtr
+  -- defineInline (T.ptr T.i64) "-" (toSig args) $
+  --   createBlocks $ execCodegen M.empty $ do
+  --     entry <- addBlock entryBlockName
+  --     setBlock entry
+  --     a <- load $ LocalReference (T.ptr T.i64) $ mkName "a"
+  --     b <- load $ LocalReference (T.ptr T.i64) $ mkName "b"
+  --     res <- instr $ Sub False False a b []
+  --     storage <- malloc 8
+  --     castedPtr <- instr $ BitCast storage (T.ptr T.i64) []
+  --     store castedPtr res
+  --     ret castedPtr
+  -- defineInline VoidType "exitWithCode"
+    -- [ (T.ptr T.i64, mkName "codePtr")] $
+      -- createBlocks $ execCodegen M.empty $ do
+        -- entry <- addBlock entryBlockName
+        -- setBlock entry
+        -- code <- load (LocalReference (T.ptr T.i64) $ mkName "codePtr")
+        -- call (cons $ C.GlobalReference (T.FunctionType VoidType [T.i64] False) $ mkName "exit") [code]
+        -- terminator $ Do $ Ret Nothing []
+  -- defineInline T.i64 "toInt"
+  --   [ (T.ptr T.i64, mkName "input")] $
+  --     createBlocks $ execCodegen M.empty $ do
+  --       entry <- addBlock entryBlockName
+  --       setBlock entry
+  --       code <- load (LocalReference (T.ptr T.i64) $ mkName "input")
+  --       ret code
+  -- defineInline T.i1 "cmpChar"
+  --   [ (T.i8, mkName "a"), (T.i8, mkName "b")] $
+  --     createBlocks $ execCodegen M.empty $ do
+  --       entry <- addBlock entryBlockName
+  --       setBlock entry
+  --       r <- instrT T.i1 $ ICmp IP.EQ (LocalReference T.i8 $ mkName "a") (LocalReference T.i8 $ mkName "b") []
+  --       terminator $ Do $ Ret (Just r) []
 
-  defineInline VoidType "poke"
-    [ (T.ptr (T.IntegerType 8),mkName "ptr")
-    , (T.ptr T.i64 , mkName "offset")
-    , (T.IntegerType 8, mkName "val")] $
-      createBlocks $ execCodegen M.empty $ do
-        let ptr = LocalReference (T.ptr T.i8) (Name "ptr")
-            val = LocalReference T.i8 (Name "val")
-            cons0 = cons (C.Int 32 0)
-        entry <- addBlock entryBlockName
-        setBlock entry
-        offset <- load (LocalReference (T.ptr T.i64) $ mkName "offset")
-        valPtr <- instrT (T.ptr T.i8) $ GetElementPtr True ptr [offset] []
-        store valPtr val
-        terminator $ Do $ Ret Nothing []
+  -- defineInline VoidType "poke"
+  --   [ (T.ptr (T.IntegerType 8),mkName "ptr")
+  --   , (T.ptr T.i64 , mkName "offset")
+  --   , (T.IntegerType 8, mkName "val")] $
+  --     createBlocks $ execCodegen M.empty $ do
+  --       let ptr = LocalReference (T.ptr T.i8) (Name "ptr")
+  --           val = LocalReference T.i8 (Name "val")
+  --           cons0 = cons (C.Int 32 0)
+  --       entry <- addBlock entryBlockName
+  --       setBlock entry
+  --       offset <- load (LocalReference (T.ptr T.i64) $ mkName "offset")
+  --       valPtr <- instrT (T.ptr T.i8) $ GetElementPtr True ptr [offset] []
+  --       store valPtr val
+  --       terminator $ Do $ Ret Nothing []
 
   let c = T.ptr T.i8
   external VoidType "putchar" [(T.i8, mkName "in" )]
   external VoidType "puts" [(c, mkName "in" )]
   external VoidType "exit" [(T.i64, mkName "code" )]
   external (T.ptr (T.IntegerType 8)) "malloc" [(T.i64, Name "size" )]
-  external (T.ptr (T.i8)) "getline" []
   external ((T.i8)) "getchar" []
-  -- external (T.ptr (T.IntegerType 8)) "itoa" [(T.IntegerType 64, Name "size" )]
-  -- define (typeToLLVM (S.TUnit)) "put2" [(c, mkName "in")] $
-  --   createBlocks $ execCodegen M.empty $ do
-  --     entry <- addBlock entryBlockName
-  --     setBlock entry
-  --     ret void
 
 malloc x = call (cons $ C.GlobalReference (T.ptr ((T.IntegerType 8))) (mkName "malloc")) [cons (C.Int 64 x)]
 
@@ -163,11 +158,15 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
       S.CCall fn args -> do
         largs <- mapM cgen args
         f <- getvar fn >>= load
+        -- case getTypefromOperand fn of
+          -- T.Ptr (Call resT _ _) _ -> 
+          -- _ -> 
         call f largs
       (S.CAssign var st) -> do
         ptr <- getvar var
         res <- cgen st
         store ptr res
+        error "store operation has no return value"
       (S.CLit pr) -> primCgen pr
       S.CStruct name t fields -> do
         -- small todo: figure out why there is a useless store instr
@@ -187,7 +186,8 @@ cgen S.CBlock {..} = last <$> mapM gen blockBody
         let fields = T.elementTypes . T.pointerReferent $ getTypefromOperand v
             getFieldType = T.ptr $ fields !! fromInteger i
 
-        valPtr <- instrT getFieldType $ GetElementPtr True v [cons (C.Int 32 0), cons (C.Int 32 i)] []
+        valPtr <- instrT getFieldType $ 
+          GetElementPtr True v [cons (C.Int 32 0), cons (C.Int 32 i)] []
         load valPtr
 
       (S.CVar name) -> getvar name >>= load
@@ -280,7 +280,7 @@ liftError = runExceptT >=> either fail return
 
 codegen :: Env -> AST.Module -> [S.CFunc] -> IO AST.Module
 codegen env mod fns = do -- withContext $ \context -> do
-  pPrint newast
+  LT.putStrLn $ ppllvm newast
   return newast
 
   -- withModuleFromAST context newast $ \m -> do

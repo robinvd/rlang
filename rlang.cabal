@@ -34,6 +34,7 @@ library
     , bytestring
     , llvm-hs-pure
     , llvm-hs
+    , llvm-hs-pretty
     , pretty-simple
   exposed-modules:
       Rlang.Checker

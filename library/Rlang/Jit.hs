@@ -50,8 +50,8 @@ passes = defaultPassSetSpec
     ]
   }
 
-runJIT :: AST.Module -> IO (AST.Module)
-runJIT mod = do
+runJIT :: AST.Module -> IO AST.Module
+runJIT mod =
   withContext $ \context ->
     jit context $ \executionEngine ->
       withModuleFromAST context mod $ \m -> do

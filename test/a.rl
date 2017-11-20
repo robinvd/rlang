@@ -13,16 +13,17 @@ extern "" cmpChar(Char, Char) -> (Bool);
 
 # import "test/prelude.rl"
 
-data StrLen = StrLen (Ptr Char, Num, Num)
-data Double a = Double (a,a)
-data DInt = DInt (Num, Num)
+# data StrLen = StrLen (Ptr Char, Num, Num)
+# data Double a = Double (a,a)
+# data DInt = DInt (Num, Num)
 
 export
 main() -> () =
   # let str: StrLen = StrLen("abc", 4, 4)
-  puts("abc\n");
-  let a: DInt = DInt(97,98)
-  putchar('c');
+  # puts("abc\n");
+  # let a: DInt = DInt(97,98)
+  # let b: Double(Num Num) = Double(97,98)
+  # putchar('c');
   # let line: Ptr Char = getline()
   # let test: Bool = cmpChar('1','2')
   # if test then
@@ -30,7 +31,9 @@ main() -> () =
   # else
     # 2
   # end;
-  exitWithCode(a -> 0)
+  # exitWithCode(0)
+  putchar('a');
+  ()
 
 # getline() -> Ptr Char = 
 #   let buffer: Ptr Char = malloc(toInt(10))
